@@ -3,7 +3,37 @@ package render
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+// layout renders the file tree, with the gloss on each line aligned by
+// measuring the name rather than by hand-typed padding - the names are
+// constants, and a rename would otherwise leave this block ragged.
+func layout() string {
+	rows := [][2]string{
+		{"    " + RosterFile, "one row per workspace: forge, counts, when it was built"},
+		{"    <workspace>/", ""},
+		{"      " + CatalogFile, "one row per repository, with a sentence saying what it is"},
+		{"      " + ActiveFile, "the same rows, minus repositories with no commit in a year"},
+		{"      " + FilesDir + "/<repo>.tsv",
+			"one per repository: every tracked file, some with a phrase"},
+	}
+	widest := 0
+	for _, row := range rows {
+		if len(row[0]) > widest {
+			widest = len(row[0])
+		}
+	}
+	var out strings.Builder
+	for _, row := range rows {
+		out.WriteString(row[0])
+		if row[1] != "" {
+			out.WriteString(strings.Repeat(" ", widest-len(row[0])+2) + row[1])
+		}
+		out.WriteString("\n")
+	}
+	return strings.TrimRight(out.String(), "\n")
+}
 
 // guide is the tree's own format reference, written at the root of every index.
 //
@@ -12,7 +42,7 @@ import (
 // pulled from a repository somebody else builds into, and reading it needs
 // nothing. A tree that could only be interpreted by consulting this project's
 // documentation would be a tree that stops working the day that page moves.
-const guide = `# Repository index
+var guide = `# Repository index
 
 A map of a set of repositories: what each one is, and what each file in it is
 for. Written by ` + "`repomap`" + `, read by anything.
@@ -22,11 +52,7 @@ parser: open a file, or grep it.
 
 ## Layout
 
-    ` + RosterFile + `                      one row per workspace: forge, counts, when it was built
-    <workspace>/
-      ` + CatalogFile + `                     one row per repository, with a sentence saying what it is
-      ` + ActiveFile + `              the same rows, minus repositories nobody has touched in a year
-      ` + FilesDir + `/<repo>.tsv           one per repository: every tracked file, some with a phrase
+` + layout() + `
 
 ## Finding the right repository
 
