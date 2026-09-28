@@ -1,0 +1,112 @@
+package config
+
+import "strconv"
+
+// The environment variables the precedence chain reads.
+const (
+	EnvProfile  = "REPOMAP_PROFILE"
+	EnvOutput   = "REPOMAP_OUTPUT"
+	EnvNoInput  = "REPOMAP_NO_INPUT"
+	EnvQuiet    = "REPOMAP_QUIET"
+	EnvFallback = "REPOMAP_SECRETS_FALLBACK"
+)
+
+// DefaultOutputFormat is the built-in bottom of the output chain.
+const DefaultOutputFormat = "table"
+
+// Overrides is the flag layer. A zero string and a nil pointer both mean "not
+// given", so the next layer decides.
+type Overrides struct {
+	Profile string
+	Output  string
+	NoInput *bool
+	Quiet   *bool
+	Plain   *bool
+}
+
+// ProfileName resolves the active profile.
+func (c *Config) ProfileName(o Overrides) string {
+	if o.Profile != "" {
+		return o.Profile
+	}
+	if v := c.lookup(EnvProfile); v != "" {
+		return v
+	}
+	return c.CurrentProfile
+}
+
+// Output resolves the output format name.
+func (c *Config) Output(o Overrides) string {
+	if o.Output != "" {
+		return o.Output
+	}
+	if v := c.lookup(EnvOutput); v != "" {
+		return v
+	}
+	if profile, err := c.Profile(c.ProfileName(o)); err == nil && profile.Output != "" {
+		return profile.Output
+	}
+	if c.DefaultOutput != "" {
+		return c.DefaultOutput
+	}
+	return DefaultOutputFormat
+}
+
+// NoInput resolves whether prompting is disabled. It is deliberately not a
+// file setting: it describes one invocation.
+func (c *Config) NoInput(o Overrides) bool {
+	return c.flag(o.NoInput, EnvNoInput)
+}
+
+// Quiet resolves whether status notes are suppressed.
+func (c *Config) Quiet(o Overrides) bool {
+	return c.flag(o.Quiet, EnvQuiet)
+}
+
+// Fallback resolves the secret-storage policy. It defaults to never, so a
+// keychain failure cannot quietly write a password to disk.
+func (c *Config) Fallback(o Overrides) (Fallback, error) {
+	if o.Plain != nil && *o.Plain {
+		return Plaintext, nil
+	}
+	if v := c.lookup(EnvFallback); v != "" {
+		if err := validateFallback(v); err != nil {
+			return "", err
+		}
+		return Fallback(v), nil
+	}
+	if c.Secrets.Fallback != "" {
+		if err := validateFallback(string(c.Secrets.Fallback)); err != nil {
+			return "", err
+		}
+		return c.Secrets.Fallback, nil
+	}
+	return Never, nil
+}
+
+// Active returns the profile in force, reporting NotFoundError when nothing is
+// current - the state a first run is in.
+func (c *Config) Active(o Overrides) (string, Profile, error) {
+	selected := c.ProfileName(o)
+	if selected == "" {
+		return "", Profile{}, &NotFoundError{Kind: KindProfile, Name: ""}
+	}
+	profile, err := c.Profile(selected)
+	if err != nil {
+		return "", Profile{}, err
+	}
+	return selected, profile, nil
+}
+
+// flag resolves one boolean. Anything but a false-looking value turns the
+// switch on, because REPOMAP_QUIET=1 must work.
+func (c *Config) flag(override *bool, env string) bool {
+	if override != nil {
+		return *override
+	}
+	if v := c.lookup(env); v != "" {
+		on, err := strconv.ParseBool(v)
+		return err != nil || on
+	}
+	return false
+}

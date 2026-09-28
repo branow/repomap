@@ -1,0 +1,86 @@
+// Package cmdutil holds what every command needs and nothing a command does.
+package cmdutil
+
+import (
+	"context"
+
+	"github.com/branow/repomap/internal/config"
+	"github.com/branow/repomap/internal/credentials"
+	"github.com/branow/repomap/internal/iostreams"
+	"github.com/branow/repomap/internal/output"
+)
+
+// Flags are the persistent flags after the precedence chain has run.
+type Flags struct {
+	Profile string
+	Output  output.Format
+	NoInput bool
+	Quiet   bool
+	Force   bool
+}
+
+// WorkspaceProbe verifies a workspace before its settings are stored.
+type WorkspaceProbe func(ctx context.Context, name string, entry config.Workspace,
+	secret credentials.Secret) error
+
+// BackendProbe verifies an llm backend before its settings are stored.
+type BackendProbe func(ctx context.Context, name string, entry config.Backend,
+	secret credentials.Secret) error
+
+// Probes carries the verification seams. A nil member is a no-op.
+type Probes struct {
+	Workspace WorkspaceProbe
+	Backend   BackendProbe
+}
+
+// Factory is the dependency bundle every command constructor takes. It exists
+// so there are no globals: a test builds one from buffers and fakes.
+type Factory struct {
+	IO     *iostreams.IOStreams
+	Config *config.Config
+	Store  credentials.Store
+	Flags  Flags
+	Probes Probes
+	// Env is a field so nothing in a test can reach the machine's real
+	// variables.
+	Env func(string) string
+}
+
+// EnvSecret returns the secret the environment already carries for a key.
+func (f *Factory) EnvSecret(key string) (credentials.Secret, bool) {
+	secret, err := credentials.NewEnv(f.Env).Get(key)
+	return secret, err == nil
+}
+
+func (f *Factory) Writer() output.Writer { return output.New(f.Flags.Output, f.IO.Out) }
+
+// Note writes a status line unless the run is quiet.
+func (f *Factory) Note(text string) error {
+	if f.Flags.Quiet {
+		return nil
+	}
+	return f.Writer().Note(text)
+}
+
+// Resolve runs the precedence chain once, from the root command's pre-run.
+func (f *Factory) Resolve(o config.Overrides) error {
+	format, err := output.ParseFormat(f.Config.Output(o))
+	if err != nil {
+		return &ValidationError{Field: "output", Value: f.Config.Output(o),
+			Allowed: output.Formats()}
+	}
+	// A --profile naming nothing is a typo, not a silent fallback to the default.
+	// Left unchecked, a CI job with a misspelled profile runs against whatever
+	// happens to be current and reports success.
+	if o.Profile != "" {
+		if _, err := f.Config.Profile(o.Profile); err != nil {
+			return err
+		}
+	}
+	f.Flags.Profile = f.Config.ProfileName(o)
+	f.Flags.Output = format
+	f.Flags.NoInput = f.Config.NoInput(o)
+	f.Flags.Quiet = f.Config.Quiet(o)
+	f.IO.SetNeverPrompt(f.Flags.NoInput)
+	return nil
+}

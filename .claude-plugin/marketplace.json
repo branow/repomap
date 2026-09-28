@@ -1,0 +1,19 @@
+{
+  "name": "repomap",
+  "owner": {
+    "name": "branow",
+    "url": "https://github.com/branow/repomap"
+  },
+  "metadata": {
+    "description": "Repository knowledge for coding agents: every repository of an account, what it is and what each of its files is for, described in plain files an agent reads without cloning anything.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "repomap",
+      "description": "Answers questions about a set of repositories without searching them: which repository owns a thing, what it is built with, which file to open, what an account even holds. Works from an index kept as plain files - committed with a project, private to a machine, or published for a team - and can build, refresh and fetch that index, and say when it has gone out of date.",
+      "source": "./plugins/repomap",
+      "version": "0.1.0"
+    }
+  ]
+}

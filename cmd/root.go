@@ -1,0 +1,100 @@
+// Package cmd is the cobra tree: it parses flags, calls internal packages and
+// renders the result. No business logic, and no command exits the process -
+// each returns an error that main translates.
+package cmd
+
+import (
+	"github.com/spf13/cobra"
+
+	"github.com/branow/repomap/internal/cmdutil"
+	"github.com/branow/repomap/internal/config"
+
+	// Every forge registers itself, so the set of supported forges is the set
+	// of packages imported here - never a switch statement to keep in step.
+	_ "github.com/branow/repomap/internal/forge/bitbucket"
+	_ "github.com/branow/repomap/internal/forge/github"
+	_ "github.com/branow/repomap/internal/forge/local"
+)
+
+// Build is the version information main stamps into the binary.
+type Build struct {
+	Version string
+	Commit  string
+	Date    string
+}
+
+// NewRoot assembles the command tree. Persistent flags are resolved once,
+// before any command body runs, so a command reads settled values from the
+// factory rather than consulting flags, environment and file for itself.
+func NewRoot(f *cmdutil.Factory, build Build) *cobra.Command {
+	var (
+		profile   string
+		format    string
+		noInput   bool
+		quiet     bool
+		force     bool
+		plaintext bool
+	)
+
+	root := &cobra.Command{
+		Use:   "repomap",
+		Short: "Index a set of repositories into a compact tree an agent reads in one pass",
+		Long: "repomap reads the repositories of an account and writes a compact " +
+			"index: what each one is, and what each file in it is for.\n\n" +
+			"Workspaces and llm backends are two independent named namespaces; a " +
+			"profile binds one of each. Secrets never enter the config file.",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+
+	flags := root.PersistentFlags()
+	flags.StringVar(&profile, "profile", "", "profile to use")
+	flags.StringVarP(&format, "output", "o", "", "output format: table or json")
+	flags.BoolVar(&noInput, "no-input", false, "never prompt; a missing value is an error")
+	flags.BoolVar(&quiet, "quiet", false, "suppress status messages")
+	flags.BoolVar(&force, "force", false, "proceed when a command would otherwise refuse")
+	flags.BoolVar(&plaintext, "allow-plaintext", false,
+		"allow a 0600 file when the keychain is unavailable")
+
+	root.PersistentPreRunE = func(*cobra.Command, []string) error {
+		overrides := config.Overrides{Profile: profile, Output: format}
+		if flags.Changed("no-input") {
+			overrides.NoInput = &noInput
+		}
+		if flags.Changed("quiet") {
+			overrides.Quiet = &quiet
+		}
+		if flags.Changed("allow-plaintext") {
+			overrides.Plain = &plaintext
+		}
+		if err := f.Resolve(overrides); err != nil {
+			return err
+		}
+		// Force describes one invocation only: it has no env or file layer.
+		f.Flags.Force = force
+		if f.Store == nil {
+			store, err := openStore(f.Config, overrides, f.IO.CanPrompt())
+			if err != nil {
+				return err
+			}
+			f.Store = store
+		}
+		return nil
+	}
+
+	root.CompletionOptions.DisableDefaultCmd = true
+	root.AddCommand(
+		newIndex(f),
+		newDoctor(f),
+		newWorkspace(f),
+		newBackend(f),
+		newProfile(f),
+		newConfig(f),
+		newCompletion(f),
+		newVersion(f, build),
+	)
+	root.SetOut(f.IO.Out)
+	root.SetErr(f.IO.ErrOut)
+	root.SetIn(f.IO.In)
+	return root
+}

@@ -1,0 +1,27 @@
+# deny everything, then allow what we track
+/*
+!/.gitignore
+!/.goreleaser.yml
+!/.github/
+!/LICENSE
+!/README.md
+!/AGENTS.md
+!/go.mod
+!/go.sum
+!/main.go
+!/cmd/
+!/internal/
+!/docs/
+!/scripts/
+!/.claude-plugin/
+!/plugins/
+
+# never tracked, anywhere
+**/repomap.yml
+**/config.yml
+**/credentials.yml
+**/*.local.*
+/go.work
+/go.work.sum
+.repomap/
+node_modules/

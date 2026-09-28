@@ -1,0 +1,44 @@
+// Command repomap reads the repositories of an account and writes a compact
+// index an agent can read in one pass. It is the only place that ends the
+// process, always through cmdutil.ExitCode: an error's type, never its text,
+// picks the status.
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"github.com/branow/repomap/cmd"
+	"github.com/branow/repomap/internal/cmdutil"
+)
+
+// Build information, stamped by the linker at release time.
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
+func main() { os.Exit(run()) }
+
+func run() int {
+	factory, err := cmd.NewFactory()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "repomap:", err)
+		return cmdutil.ExitCode(err)
+	}
+	// A build can run for minutes, so it has to be interruptible. Cancelling the
+	// context lets the pipeline stop where it is rather than be killed mid-write.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	root := cmd.NewRoot(factory, cmd.Build{Version: version, Commit: commit, Date: date})
+	if err := root.ExecuteContext(ctx); err != nil {
+		fmt.Fprintln(factory.IO.ErrOut, "repomap:", err)
+		return cmdutil.ExitCode(err)
+	}
+	return cmdutil.ExitOK
+}
