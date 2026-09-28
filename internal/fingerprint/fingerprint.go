@@ -38,18 +38,13 @@ func Normalize(text string) string {
 	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
-// Canonical is the exact text a repository's fingerprint is taken over,
-// written out line by line so adding a field to catalog.Tree cannot move the
-// hash by accident.
+// Canonical is the exact text a repository's fingerprint is taken over. Written
+// out line by line so adding a field to catalog.Tree cannot move the hash.
 //
-// What is in it is exactly what the describer sees: the inventory of paths, the
-// README, and the forge's own summary. A fact the model reads but the hash does
-// not is a fact that can change the answer without ever earning a fresh one.
-//
-// What is deliberately NOT in it is the commit hash. HEAD moves on every
-// commit, including the ones that fix a typo inside a file the index names but
-// does not read - and treating those as changes is the single-tier behaviour
-// this package exists to avoid.
+// Everything the describer sees appears here. A fact the model reads but the
+// hash does not is a fact that changes the answer without earning a fresh one.
+// The commit hash is deliberately absent: HEAD moves on every commit, including
+// the ones inside a file the index names but never reads.
 func Canonical(repo catalog.Repo, tree catalog.Tree) string {
 	lines := make([]string, 0, len(tree.Files)+3)
 	lines = append(lines, "summary "+Normalize(repo.Summary))

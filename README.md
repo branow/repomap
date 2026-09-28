@@ -80,8 +80,7 @@ grep -i checkout .repomap/acme/repos-active.tsv
 grep -n router .repomap/acme/files/order-service.tsv
 ```
 
-Driving the build yourself is four commands, and the first one needs no
-credential at all — point it at the checkouts you already have:
+Driving the build yourself is four commands, and the first needs no credential:
 
 ```sh
 brew install branow/tap/repomap
@@ -93,15 +92,12 @@ repomap profile create dev --workspace local --backend haiku && repomap profile 
 repomap index
 ```
 
-An account on a real forge is the same shape:
+A real forge is the same shape: `repomap workspace add acme --forge github
+--slug acme --auth token`.
 
-```sh
-repomap workspace add acme --forge github --slug acme --auth token
-```
-
-On an account you do not own, start with `repomap index --dry-run`, which
-reports the plan without cloning anything. Other install methods and every flag
-are in the [CLI reference](docs/CLI.md).
+On an account you do not own, start with `repomap index --dry-run`, which reports
+the plan without cloning anything. Other install methods and every flag are in
+the [CLI reference](docs/CLI.md).
 
 ## Documentation
 

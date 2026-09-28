@@ -14,13 +14,10 @@ import (
 // handful of them, and the rest is prompt budget spent on a list.
 const MaxSubdirs = 8
 
-// Structure renders a two-level directory sketch of a file list: top-level
-// directories with a few of their immediate subdirectories, then the top-level
-// files.
-//
-// It exists because a flat list of two thousand paths is a poor way to tell a
-// model what a repository IS, while the shape of its top two levels is a very
-// good one - and because that sketch is what a human reads first too.
+// Structure renders a two-level directory sketch: top-level directories with a
+// few of their immediate subdirectories, then the top-level files. A flat list
+// of two thousand paths is a poor way to say what a repository IS; the shape of
+// its top two levels is what a person reads first too.
 func Structure(files []catalog.File) string {
 	subdirs := map[string]map[string]struct{}{}
 	var roots []string

@@ -28,9 +28,8 @@ storefront       1204   64 MB   2026-09-27  2026-09-27T16:04:55Z  b8faf991d5fdbc
 legacy-importer  88     3 MB    2021-04-02  2021-04-02T09:10:00Z  94141fe08d0f22c2  (archived)
 ```
 
-`activity` and `fingerprint` are build state; ignore them. A description in
-parentheses is not a description — it says the repository was listed and
-deliberately not described.
+A description in parentheses is not a description: it says the repository was
+listed and deliberately not described.
 
 `files/order-service.tsv` — every tracked path, with a phrase on the ones whose
 purpose the path does not already give away:
@@ -46,10 +45,9 @@ src/main/resources/application.yml            61     2 KB
 pom.xml                                       140    5 KB
 ```
 
-A row with no phrase is a file whose path already says what it is. That is the
-common case, and not a gap.
-
-Everything is plain text, so an agent — or `grep` — reads it without a parser.
+A row with no phrase is a file whose path already says what it is - the common
+case, not a gap. Everything is plain text, so an agent — or `grep` — reads it
+without a parser.
 
 ## Workspaces and backends
 
@@ -77,16 +75,14 @@ Supported forges are `bitbucket`, `github` and `local`. Authentication is `token
 or `none`.
 
 `local` needs no credential and no network: it indexes the checkouts already in
-`--dir`, reading them where they are and never writing to them. It is the fastest
-way to see what this tool produces, and the right choice when something else
-already maintains a checkout tree.
+`--dir`, reading them where they are and never writing to them.
 
 A Bitbucket app password is presented as basic auth and so needs `--username`; a
 GitHub token stands alone. A self-hosted forge takes `--base-url` pointing at its
 API root. `--exclude` is repeatable and drops any repository whose name contains
 the substring.
 
-Clones land under the user's cache directory. `--clones <dir>` points a workspace
+Clones land under the user's cache directory; `--clones <dir>` points a workspace
 at a tree something else maintains instead.
 
 Backends are `anthropic`, `openai` (any OpenAI-compatible endpoint, including
@@ -157,9 +153,9 @@ describe      at most 12, decided by content fingerprint after the scan
 
 ## Checking a workspace
 
-`repomap doctor` reports one line per check and sends almost nothing — one
-listing call and one probe of one clone url. Nothing is cloned, no file is read
-and no model is called:
+`repomap doctor` reports one line per check and sends almost nothing: one
+listing call and one probe of one clone url, with no clone, no file read and no
+model call.
 
 ```
 CHECK       STATUS  DETAIL
@@ -171,9 +167,8 @@ clone       pass    git reached git@github.com:acme/order-service.git
 backend     pass    haiku: claudecode claude-haiku-4-5
 ```
 
-The two failures worth separating are the ones that look alike from a terminal: a
-token the forge refused, which no amount of waiting fixes, and a remote this
-machine cannot reach, which is usually a VPN that dropped.
+It separates the two failures that look alike from a terminal: a token the forge
+refused, and a remote this machine cannot reach.
 
 ## Scripting and CI
 
@@ -193,10 +188,9 @@ Exit codes are meaningful:
 | 5 | Not found |
 | 6 | Unavailable — forge unreachable, git remote unreachable, rate limited |
 
-A run where some repository was left without a description exits 6, because a
-tree whose description column is empty is not a success. A repository that could
-not be cloned does not fail the run: it is one row missing from a tree that is
-otherwise correct, and the summary names it.
+A repository left without a description exits 6: a tree whose description column
+is empty is not a success. One that could not be cloned does not fail the run -
+it is a single missing row, and the summary names it.
 
 Settings resolve as **flag > environment > config file > built-in default**.
 Configuration lives in `~/.config/repomap/config.yml` (`%AppData%\repomap` on

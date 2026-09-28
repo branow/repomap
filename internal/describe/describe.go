@@ -14,19 +14,13 @@ import (
 	"github.com/branow/repomap/internal/catalog"
 )
 
+// One call per repository, never a batch: a repository's prompt is its whole
+// file list, so two in one request answer worse and fail together.
+
 // DefaultWorkers is one: a library caller gets deterministic ordering unless it
 // asks otherwise. The command sets its own ceiling, because describing is the
 // long pole of a build and every repository is independent.
 const DefaultWorkers = 1
-
-// One call per repository, never a batch.
-//
-// dbmap batches several database objects into one call, and it is right to: a
-// two-column lookup table's prompt is a few hundred characters, so a call per
-// object would be a thousand calls buying a thousand sentences. A repository's
-// prompt is its whole file list. Two of them in one call is a prompt the model
-// answers worse, for a saving of one request - and a failure then loses both.
-// The concurrency below is where the wall-clock saving actually is.
 
 // Result is what a run produced.
 type Result struct {

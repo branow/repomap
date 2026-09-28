@@ -21,14 +21,10 @@ const MaxPaths = 600
 const System = "You index source repositories for a search tool. You answer only " +
 	"about what you are shown, and you never speculate about code you were not given."
 
-// Schema is the answer's shape.
-//
-// The output field is named `sentence`, not `description`. With a field named
-// `description` whose schema text reads "one sentence saying what this
-// repository does", every model measured fills it with a description OF THE
-// FIELD - "One-sentence summary of the repository's purpose and stack" - and
-// better instruction-following makes it more reliably wrong. The same applies
-// to the per-file field, which is `purpose` for the same reason.
+// Schema is the answer's shape. The fields are `sentence` and `purpose`, never
+// `description`: models fill a `description` field with a description of the
+// field instead, and each field's text is an ORDER rather than a noun phrase.
+// A test pins both.
 var Schema = json.RawMessage(`{
   "type": "object",
   "additionalProperties": false,

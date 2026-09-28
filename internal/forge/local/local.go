@@ -1,11 +1,7 @@
-// Package local lists the repositories already checked out in a directory.
-//
-// It is the forge with no API, no credential and no network, and it exists for
-// two reasons. Somebody trying this tool for the first time can index the
-// checkouts they already have, before deciding whether to give it access to
-// anything. And a team whose clones are maintained by something else - a
-// workspace tool, a monorepo split, a CI cache - points this at that tree
-// rather than keeping a second copy of every repository.
+// Package local lists the repositories already checked out in a directory: the
+// forge with no API, no credential and no network. It is what lets somebody try
+// the tool before granting it access to anything, and what points it at a
+// checkout tree something else already maintains.
 package local
 
 import (

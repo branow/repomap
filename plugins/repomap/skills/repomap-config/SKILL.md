@@ -25,6 +25,6 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/roots.js $ARGUMENTS
 An index committed in the current repository is found automatically and is never
 registered. Exits non-zero on a bad argument.
 
-Repositories appear and are retired on the scale of weeks, so `remind 168` (a
-week) suits an active account and `remind 720` (a month) a settled one. When an
-index is overdue, offer `/repomap-build` rather than repeating the warning.
+Repositories appear and are retired over weeks, so `remind 168` (a week) suits
+an account better than a threshold in days. When an index is overdue, offer
+`/repomap-build` rather than repeating the warning.

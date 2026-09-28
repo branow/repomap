@@ -17,15 +17,14 @@ import (
 // anyone looking for the right one.
 const CatalogFile = "repos.tsv"
 
-// ActiveFile is the same catalog with the long-dead repositories left out. It
-// is a VIEW, not state: it carries no fingerprint, is never read back by a
-// build, and is rewritten from the catalog every run.
+// ActiveFile is the same catalog with the long-dead repositories left out. It is
+// a VIEW, not state: it carries no fingerprint, is never read back by a build,
+// and is rewritten from the catalog every run.
 //
-// It exists for the reader's sake alone. Finding the right repository means
-// reading the catalog whole - that is what a list of one-sentence descriptions
-// is for - and on an account that has accumulated a decade of experiments most
-// of those rows are for repositories nobody has touched since. A reader who
-// opens this one reads a third of the bytes and finds the same answer.
+// It exists for the reader alone. Finding the right repository means reading the
+// catalog whole, and on an old account most of those rows are for repositories
+// nobody has touched since. A reader who opens this one reads a third of the
+// bytes and finds the same answer.
 const ActiveFile = "repos-active.tsv"
 
 // FilesDir holds one file per repository: its full inventory.
@@ -38,16 +37,12 @@ var catalogHeader = []string{
 	"repo", "files", "size", "commit", "activity", "fingerprint", "description",
 }
 
-// Catalog writes the workspace catalog, merging entries into whatever the file
-// already holds.
-//
-// A build MERGES rather than replaces, because a narrowed run (--match,
-// --limit) covers only the repositories it selected. Rewriting the catalog from
-// that selection alone would delete the fingerprint of every repository the run
-// did not look at, so the next full build would see them all as new and buy
-// every description again. A row is replaced when this run covered it, removed
-// when the forge no longer has the repository, and otherwise left exactly as it
-// was.
+// Catalog writes the workspace catalog, MERGING entries into whatever the file
+// already holds. A narrowed run (--match, --limit) covers only what it selected,
+// so rewriting from that selection would delete the fingerprint of every
+// repository the run never looked at and make the next full build buy every
+// description again. A row is replaced when this run covered it, removed when
+// the forge no longer has it, and otherwise left exactly as it was.
 func Catalog(dir string, entries []catalog.Entry, dropped []string) (int, error) {
 	if err := os.MkdirAll(dir, dirMode); err != nil {
 		return 0, err

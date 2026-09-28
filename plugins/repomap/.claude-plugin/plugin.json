@@ -1,6 +1,6 @@
 {
   "name": "repomap",
   "version": "0.1.0",
-  "description": "Answers questions about a set of repositories without searching them: which repository owns a feature, what it is built with, which file to open, what an account even holds. Works from an index kept as plain files - committed with a project, private to a machine, or published for a team - and can build, refresh and fetch that index, and say when it has gone out of date.",
+  "description": "Answers questions about a set of repositories without searching them: which one owns a feature, what it is built with, which file to open, what an account holds. Works from an index kept as plain files - committed with a project, private to a machine, or published for a team - and can build, refresh and fetch that index, and say when it has gone out of date.",
   "skills": "./skills/"
 }

@@ -1,11 +1,10 @@
-// Package git is the git command line, and nothing above it. Every call is a
-// read of an existing checkout except Clone and Fetch, which are the only two
-// that touch a network.
+// Package git is the git command line, and nothing above it. Every call reads an
+// existing checkout except Clone and Update, the only two that touch a network.
 //
 // It shells out rather than linking a git implementation: the machine running a
-// build already has git configured with the credential helper, the proxy and
-// the SSH keys that reach the forge, and reimplementing that is how a tool ends
-// up with its own broken half of an authentication story.
+// build already has the credential helper, the proxy and the SSH keys that reach
+// the forge, and reimplementing those is how a tool grows its own broken half of
+// an authentication story.
 package git
 
 import (
