@@ -43,6 +43,15 @@ function dirFor(registry, workspace, repo) {
   return join(root(registry), workspace, repo);
 }
 
+// A local-forge workspace has nothing to clone, by design: its repositories are
+// checkouts that were already on disk, which the build read where they sat and
+// never wrote to. There is no clone url to record and nothing for a sync to
+// fetch, so one must not be reported as an index that needs rebuilding - that is
+// a false alarm on every session start, about a problem no rebuild would fix.
+function syncable(forge) {
+  return forge !== "local";
+}
+
 // repos reads the catalog rows of one workspace: the name and the clone url, by
 // header name rather than by column position so a build that adds a column does
 // not silently shift what this reads.
@@ -108,6 +117,9 @@ function ageHours(dir) {
 // repository nobody can reach must not stop the other two hundred.
 async function sync(registry, treePath, workspace, opts = {}) {
   const log = opts.log;
+  if (opts.forge && !syncable(opts.forge)) {
+    return { synced: 0, failed: [], skipped: [], local: true };
+  }
   const { work, unreachable } = plan(registry, treePath, workspace, opts);
 
   for (const name of unreachable) {
@@ -183,10 +195,13 @@ function prune(registry, treePath, workspace) {
 }
 
 // held reports how many of a workspace's repositories are on disk, so `list` can
-// say whether the code behind an index is actually reachable.
-function held(registry, treePath, workspace) {
-  let present = 0;
+// say whether the code behind an index is actually reachable. A local-forge
+// workspace reports `local` instead of 0 of N: its code is on disk somewhere this
+// plugin does not manage, and a count would read as code missing.
+function held(registry, treePath, workspace, forge) {
   const all = repos(treePath, workspace);
+  if (forge && !syncable(forge)) return { local: true, total: all.length };
+  let present = 0;
   for (const repo of all) {
     if (existsSync(join(dirFor(registry, workspace, repo.name), ".git"))) present++;
   }
@@ -223,13 +238,14 @@ function workspacesOf(trees) {
   for (const tree of trees) {
     if (!tree.present) continue;
     for (const ws of roster.workspaces(tree.path)) {
-      out.push({ tree: tree.name, path: tree.path, workspace: ws.workspace });
+      out.push({ tree: tree.name, path: tree.path, workspace: ws.workspace, forge: ws.forge });
     }
   }
   return out;
 }
 
 module.exports = {
+  syncable,
   StaleAfterHours,
   Concurrency,
   root,

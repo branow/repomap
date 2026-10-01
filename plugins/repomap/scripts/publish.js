@@ -95,9 +95,16 @@ const clis = [
   { bin: "bkt", argv: (b) => ["pr", "create", "--source", b, "--title", "Refresh the repository index"] },
 ];
 
+// installed probes by running the binary rather than by asking a shell, because
+// `command -v` is a POSIX builtin and this has to work on Windows too.
+function installed(bin) {
+  const r = spawnSync(bin, ["--version"], { encoding: "utf8" });
+  return !r.error;
+}
+
 function openPR(repo, branch) {
   for (const cli of clis) {
-    if (spawnSync("command", ["-v", cli.bin], { shell: true }).status !== 0) continue;
+    if (!installed(cli.bin)) continue;
     const r = spawnSync(cli.bin, cli.argv(branch), { cwd: repo, encoding: "utf8" });
     if (r.status === 0) return `opened a pull request with ${cli.bin}\n${(r.stdout ?? "").trim()}\n`;
     return `${cli.bin} could not open a pull request: ${(r.stderr ?? "").trim()}\nOpen one from ${branch} by hand.\n`;

@@ -55,8 +55,13 @@ async function main(argv) {
         threshold: effective,
         concurrency,
         only,
+        forge: target.forge,
         log,
       });
+      if (result.local) {
+        say(flags, `${target.workspace}: local checkouts, nothing to fetch`);
+        continue;
+      }
       if (flags.prune) {
         const removed = clones.prune(registry, target.path, target.workspace);
         if (removed.length > 0) {

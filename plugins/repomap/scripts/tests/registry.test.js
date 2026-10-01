@@ -119,3 +119,16 @@ test("a root with no path is dropped rather than guessed at", () => {
 
   assert.deepEqual(reg.read().roots, []);
 });
+
+// A setting with no way to set it is a setting nobody has.
+test("every stored setting has a command that reaches it", () => {
+  const { readFileSync } = require("node:fs");
+  const { join } = require("node:path");
+  const roots = readFileSync(join(__dirname, "..", "roots.js"), "utf8");
+  const registry = readFileSync(join(__dirname, "..", "lib", "registry.js"), "utf8");
+
+  for (const [, setter] of registry.matchAll(/function (set[A-Z]\w+)\(/g)) {
+    assert.match(roots, new RegExp(`registry\\.${setter}\\(|\\b${setter}\\(`),
+      `${setter} is stored but no roots.js command sets it`);
+  }
+});

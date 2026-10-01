@@ -53,10 +53,11 @@ func Catalog(dir string, entries []catalog.Entry, dropped []string) (int, error)
 	}
 	path := filepath.Join(dir, CatalogFile)
 
-	rows, err := readCatalog(path)
+	table, err := readCatalog(path)
 	if err != nil {
 		return 0, err
 	}
+	rows := migrate(table)
 	for _, entry := range entries {
 		rows[entry.Key()] = row(entry)
 	}
@@ -82,6 +83,26 @@ func Catalog(dir string, entries []catalog.Entry, dropped []string) (int, error)
 	return len(ordered), nil
 }
 
+// migrate rewrites every row a merge carries forward into this build's column
+// order, so one build is enough to bring an older tree current rather than
+// leaving a file whose rows disagree about what their columns mean.
+func migrate(table Table) map[string][]string {
+	rows := make(map[string][]string, len(table.Rows))
+	for name, cells := range table.Rows {
+		if len(table.Header) == len(catalogHeader) && table.At(cells, "remote") != "" {
+			rows[name] = cells
+			continue
+		}
+		current := make([]string, len(catalogHeader))
+		for i, column := range catalogHeader {
+			current[i] = table.At(cells, column)
+		}
+		current[0] = name
+		rows[name] = current
+	}
+	return rows
+}
+
 func row(entry catalog.Entry) []string {
 	description := entry.Description
 	if entry.Skip != "" {
@@ -104,18 +125,23 @@ func row(entry catalog.Entry) []string {
 // State reads back what the previous build recorded, from the files it wrote.
 // A tree that has never been built returns an empty state and no error: a first
 // build is not a failure.
+//
+// Columns are read BY NAME. Adding one shifted every position after it, and a
+// build reading an older tree by position found no description on any row - so
+// the whole account looked undescribed and every repository was bought again. A
+// header lookup makes that class of mistake impossible instead of careful.
 func State(dir string) (map[string]catalog.State, error) {
-	rows, err := readCatalog(filepath.Join(dir, CatalogFile))
+	table, err := readCatalog(filepath.Join(dir, CatalogFile))
 	if err != nil {
 		return nil, err
 	}
-	state := make(map[string]catalog.State, len(rows))
-	for name, cells := range rows {
+	state := make(map[string]catalog.State, len(table.Rows))
+	for name, cells := range table.Rows {
 		entry := catalog.State{
-			Remote:      cell(cells, 4),
-			Activity:    catalog.Signal(cell(cells, 5)),
-			Fingerprint: cell(cells, 6),
-			Description: cell(cells, 7),
+			Remote:      table.At(cells, "remote"),
+			Activity:    catalog.Signal(table.At(cells, "activity")),
+			Fingerprint: table.At(cells, "fingerprint"),
+			Description: table.At(cells, "description"),
 		}
 		// A skipped row's placeholder is not a description: reading it back as
 		// one would make an archived repository look described, and a repository
@@ -129,16 +155,36 @@ func State(dir string) (map[string]catalog.State, error) {
 	return state, nil
 }
 
-// readCatalog parses the catalog into rows keyed by repository name, tolerating
-// a missing file and ignoring the header.
-func readCatalog(path string) (map[string][]string, error) {
-	rows := map[string][]string{}
+// Table is a parsed catalog: its rows keyed by repository name, and the header
+// they are to be read against. A tree written by a different version of this
+// tool has a different header, which is the whole reason the header travels with
+// the rows.
+type Table struct {
+	Header []string
+	Rows   map[string][]string
+}
+
+// At reads one cell by column name. A column this tree does not have reads
+// empty, which is what an older tree should look like - absent, never
+// misaligned.
+func (t Table) At(cells []string, column string) string {
+	for i, name := range t.Header {
+		if name == column {
+			return cell(cells, i)
+		}
+	}
+	return ""
+}
+
+// readCatalog parses the catalog into a Table, tolerating a missing file.
+func readCatalog(path string) (Table, error) {
+	table := Table{Header: catalogHeader, Rows: map[string][]string{}}
 	file, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return rows, nil
+		return table, nil
 	}
 	if err != nil {
-		return nil, err
+		return Table{}, err
 	}
 	defer file.Close()
 
@@ -150,12 +196,18 @@ func readCatalog(path string) (map[string][]string, error) {
 			continue
 		}
 		cells := strings.Split(line, tab)
-		if cells[0] == "" || cells[0] == catalogHeader[0] {
+		if cells[0] == "" {
 			continue
 		}
-		rows[cells[0]] = cells
+		if cells[0] == catalogHeader[0] {
+			// The tree's own header wins over this build's: it is what its rows
+			// were written against.
+			table.Header = cells
+			continue
+		}
+		table.Rows[cells[0]] = cells
 	}
-	return rows, scanner.Err()
+	return table, scanner.Err()
 }
 
 // readPhrases reads the per-file phrases a previous build wrote, so a

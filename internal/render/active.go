@@ -23,14 +23,14 @@ func Active(dir string, years int, now time.Time) (kept, total int, err error) {
 	if years <= 0 {
 		years = DefaultActiveYears
 	}
-	rows, err := readCatalog(filepath.Join(dir, CatalogFile))
+	table, err := readCatalog(filepath.Join(dir, CatalogFile))
 	if err != nil {
 		return 0, 0, err
 	}
 
 	cutoff := now.AddDate(-years, 0, 0).Format(dateLayout)
-	names := make([]string, 0, len(rows))
-	for name := range rows {
+	names := make([]string, 0, len(table.Rows))
+	for name := range table.Rows {
 		names = append(names, name)
 	}
 	sort.Strings(names)
@@ -40,10 +40,10 @@ func Active(dir string, years int, now time.Time) (kept, total int, err error) {
 		// A row whose commit date is missing or unparseable is kept. The view
 		// exists to hide what is certainly dead, and a row that cannot be dated
 		// is not certainly anything.
-		if date := cell(rows[name], 3); isDate(date) && date < cutoff {
+		if date := table.At(table.Rows[name], "commit"); isDate(date) && date < cutoff {
 			continue
 		}
-		ordered = append(ordered, rows[name])
+		ordered = append(ordered, table.Rows[name])
 	}
 
 	preamble := strings.Join([]string{

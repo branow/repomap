@@ -1,7 +1,7 @@
 ---
 name: repomap-config
 description: Use when a developer wants to see which repository indexes this machine reads, connect it to one a team publishes, fetch or update that index, or be reminded (or stop being reminded) when an index is overdue a rebuild.
-argument-hint: [list | add <path> | add --remote=<url> [--subdir=<dir>] | sync [<name>] | remove <name> | remind <hours>|off]
+argument-hint: [list | add <path> | add --remote=<url> [--subdir=<dir>] | sync [<name>] | clones [<workspace>] | remove <name> | remind <hours>|off | notify <level>]
 allowed-tools: [Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/roots.js*)]
 ---
 
@@ -18,9 +18,13 @@ node ${CLAUDE_PLUGIN_ROOT}/scripts/roots.js $ARGUMENTS
 - `add --remote=<git url> [--subdir=<dir in the repo>] [--branch=<branch>]` -
   read a tree a team publishes; follow with `sync`
 - `sync [<name>]` - clone or update the published trees
+- `clones [<workspace>]` - where the repositories are kept, and how many are
+  there; `/repomap-sync` is what fetches them
 - `remove <name>`
 - `remind <hours>` / `remind off` - session-start warning that an index is
   overdue, off until set
+- `notify <debug|info|warn|error>` / `notify default` - how loudly the background
+  sync reports; `warn` means a healthy one is silent
 
 An index committed in the current repository is found automatically and is never
 registered. Exits non-zero on a bad argument.

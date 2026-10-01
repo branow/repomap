@@ -50,10 +50,11 @@ func WriteRoster(root string, entry Roster) error {
 	}
 	path := filepath.Join(root, RosterFile)
 
-	rows, err := readRoster(path)
+	table, err := readRoster(path)
 	if err != nil {
 		return err
 	}
+	rows := table.Rows
 	rows[entry.Workspace] = []string{
 		entry.Workspace,
 		entry.Forge,
@@ -80,20 +81,20 @@ func WriteRoster(root string, entry Roster) error {
 // how a reader - and the plugin that finds trees on this machine - asks what is
 // in one without running a build.
 func ReadRoster(root string) ([]Roster, error) {
-	rows, err := readRoster(filepath.Join(root, RosterFile))
+	table, err := readRoster(filepath.Join(root, RosterFile))
 	if err != nil {
 		return nil, err
 	}
-	out := make([]Roster, 0, len(rows))
-	for _, cells := range rows {
-		built, _ := time.Parse(time.RFC3339, cell(cells, 6))
+	out := make([]Roster, 0, len(table.Rows))
+	for _, cells := range table.Rows {
+		built, _ := time.Parse(time.RFC3339, table.At(cells, "built"))
 		out = append(out, Roster{
-			Workspace: cell(cells, 0),
-			Forge:     cell(cells, 1),
-			Slug:      cell(cells, 2),
-			Repos:     number(cell(cells, 3)),
-			Active:    number(cell(cells, 4)),
-			Files:     number(cell(cells, 5)),
+			Workspace: table.At(cells, "workspace"),
+			Forge:     table.At(cells, "forge"),
+			Slug:      table.At(cells, "account"),
+			Repos:     number(table.At(cells, "repos")),
+			Active:    number(table.At(cells, "active")),
+			Files:     number(table.At(cells, "files")),
 			Built:     built,
 		})
 	}
@@ -101,14 +102,14 @@ func ReadRoster(root string) ([]Roster, error) {
 	return out, nil
 }
 
-func readRoster(path string) (map[string][]string, error) {
-	rows := map[string][]string{}
+func readRoster(path string) (Table, error) {
+	table := Table{Header: rosterHeader, Rows: map[string][]string{}}
 	file, err := os.Open(path)
 	if errors.Is(err, fs.ErrNotExist) {
-		return rows, nil
+		return table, nil
 	}
 	if err != nil {
-		return nil, err
+		return Table{}, err
 	}
 	defer file.Close()
 
@@ -120,12 +121,16 @@ func readRoster(path string) (map[string][]string, error) {
 			continue
 		}
 		cells := strings.Split(line, tab)
-		if cells[0] == "" || cells[0] == rosterHeader[0] {
+		if cells[0] == "" {
 			continue
 		}
-		rows[cells[0]] = cells
+		if cells[0] == rosterHeader[0] {
+			table.Header = cells
+			continue
+		}
+		table.Rows[cells[0]] = cells
 	}
-	return rows, scanner.Err()
+	return table, scanner.Err()
 }
 
 func number(value string) int {

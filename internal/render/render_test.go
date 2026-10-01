@@ -315,3 +315,75 @@ func TestTheCatalogRecordsWhereTheCodeIs(t *testing.T) {
 		t.Error("a merge dropped the clone url")
 	}
 }
+
+// TestAnOlderTreeIsReadNotMisaligned pins the worst bug this format has had.
+// Adding the `remote` column shifted every position after it, and a build that
+// read by position found no description on any row - so the whole account looked
+// undescribed and every repository was bought again on the first run after an
+// upgrade.
+func TestAnOlderTreeIsReadNotMisaligned(t *testing.T) {
+	dir := t.TempDir()
+	// Exactly what the previous release wrote: no `remote`.
+	if err := os.WriteFile(filepath.Join(dir, CatalogFile), []byte(
+		"repo\tfiles\tsize\tcommit\tactivity\tfingerprint\tdescription\n"+
+			"api\t12\t1 MB\t2026-01-01\t2026-01-01T00:00:00Z\tabc123def456\tPlaces orders, Java and Spring Boot.\n",
+	), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	state, err := State(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := state["api"]
+	if got.Description != "Places orders, Java and Spring Boot." {
+		t.Errorf("description = %q; an empty one rebuys every row", got.Description)
+	}
+	if got.Fingerprint != "abc123def456" {
+		t.Errorf("fingerprint = %q", got.Fingerprint)
+	}
+	if got.Activity.String() != "2026-01-01T00:00:00Z" {
+		t.Errorf("activity = %q", got.Activity)
+	}
+	// A column the older tree does not have reads empty - absent, never the
+	// neighbouring column's value.
+	if got.Remote != "" {
+		t.Errorf("remote = %q, want empty on a tree written before the column existed", got.Remote)
+	}
+}
+
+// TestOneBuildBringsAnOlderTreeCurrent: a merge must not leave a file whose rows
+// disagree about what their columns mean.
+func TestOneBuildBringsAnOlderTreeCurrent(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, CatalogFile), []byte(
+		"repo\tfiles\tsize\tcommit\tactivity\tfingerprint\tdescription\n"+
+			"untouched\t12\t1 MB\t2026-01-01\t2026-01-01T00:00:00Z\told-hash\tthe untouched one\n",
+	), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	fresh := entry("fresh", "the fresh one", "2026-02-01", "main.go")
+	fresh.Repo.Remote = "git@example.internal:acme/fresh.git"
+	if _, err := Catalog(dir, []catalog.Entry{fresh}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	body := read(t, filepath.Join(dir, CatalogFile))
+	if !strings.HasPrefix(body, strings.Join(catalogHeader, "\t")) {
+		t.Fatalf("the header was not brought current:\n%s", body)
+	}
+	for _, line := range strings.Split(strings.TrimSpace(body), "\n") {
+		if cells := strings.Split(line, "\t"); len(cells) != len(catalogHeader) {
+			t.Errorf("a row has %d cells against a %d-column header: %q",
+				len(cells), len(catalogHeader), line)
+		}
+	}
+	state, _ := State(dir)
+	if state["untouched"].Description != "the untouched one" {
+		t.Errorf("the carried-forward row lost its description: %q", state["untouched"].Description)
+	}
+	if state["fresh"].Remote != fresh.Repo.Remote {
+		t.Errorf("the fresh row lost its remote: %q", state["fresh"].Remote)
+	}
+}

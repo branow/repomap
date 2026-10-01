@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.js --data-dir=${CLAUDE_PLUGIN_DATA} --quiet",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.js --data-dir=${CLAUDE_PLUGIN_DATA} --prune --quiet",
             "async": true
           },
           {

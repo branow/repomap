@@ -220,3 +220,43 @@ test("the catalog is parsed by column name, not position", () => {
   );
   assert.equal(clones.repos(dir, "ws")[0].remote, "git@example.internal:a/api.git");
 });
+
+// The background run is the only thing that ever deletes a retired clone, so it
+// has to prune. A session-start hook that did not would accumulate the clone of
+// every repository ever retired, forever.
+test("the session-start hook is the one that prunes", () => {
+  const hooks = JSON.parse(
+    require("node:fs").readFileSync(join(__dirname, "..", "..", "hooks", "hooks.json"), "utf8"),
+  );
+  const background = JSON.stringify(hooks.hooks.SessionStart);
+  assert.match(background, /sync\.js/);
+  assert.match(background, /--prune/, "the background sync never prunes");
+  assert.match(background, /"async":\s*true/, "the clone sync blocks session start");
+});
+
+// A local-forge workspace has nothing to clone by design. Reported as an index
+// needing a rebuild, it was a false alarm on every session start about a problem
+// no rebuild would fix.
+test("a local-forge workspace is not a broken one", async () => {
+  const reg = registry();
+  const path = tree([{ name: "api", remote: "" }, { name: "web", remote: "" }]);
+  writeFileSync(
+    join(path, "workspaces.tsv"),
+    "workspace\tforge\taccount\trepos\tactive\tfiles\tbuilt\n" +
+      "ws\tlocal\t/home/someone/src\t2\t2\t1\t2026-10-01T00:00:00Z\n",
+  );
+  const log = createLog(reg.root);
+
+  const result = await clones.sync(reg, path, "ws", { forge: "local", log });
+
+  assert.ok(result.local, "a local workspace was treated as syncable");
+  assert.equal(log.unread("warn").entries.length, 0, "a local workspace raised a warning");
+  // And its clone state is not reported as code missing.
+  assert.ok(clones.held(reg, path, "ws", "local").local);
+  assert.equal(clones.held(reg, path, "ws", "github").present, 0);
+});
+
+test("syncable is decided by forge, not by a missing url", () => {
+  assert.equal(clones.syncable("local"), false);
+  for (const forge of ["github", "bitbucket", ""]) assert.ok(clones.syncable(forge));
+});

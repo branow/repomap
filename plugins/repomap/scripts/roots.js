@@ -10,6 +10,7 @@
 //   add [<path>] [--name=N] [--remote=URL] [--subdir=REL] [--branch=B]
 //   remove <name>
 //   remind <hours> | remind off
+//   notify <level> | notify default  how loudly the activity hook reports
 //   sync [<name>]                    fetch the published index trees
 //   clones [<workspace>]             fetch the repositories an index points at
 //
@@ -23,12 +24,14 @@ const git = require("./lib/git.js");
 const roster = require("./lib/roster.js");
 const clones = require("./lib/clones.js");
 const { createRegistry } = require("./lib/registry.js");
+const { LEVELS } = require("./lib/log.js");
 
 const COMMANDS = {
   list: list,
   add: add,
   remove: drop,
   remind: remind,
+  notify: notify,
   sync: sync,
   clones: cloneRoots,
 };
@@ -56,6 +59,7 @@ function list(registry, _rest, flags) {
 
   const threshold = registry.remindAfterHours();
   out(`reminder: ${threshold ? `on, once a tree is older than ${threshold} hours` : "off"}\n`);
+  out(`notify: ${registry.notifyLevel() ?? "warn (default)"}\n`);
   if (found.trees.length === 0) {
     return out(
       "no index tree on this machine\n" +
@@ -91,7 +95,7 @@ function inspect(root, registry) {
   const present = roster.isTree(root.path);
   const workspaces = (present ? roster.workspaces(root.path) : []).map((ws) => ({
     ...ws,
-    clones: clones.held(registry, root.path, ws.workspace),
+    clones: clones.held(registry, root.path, ws.workspace, ws.forge),
     clonesDir: join(clones.root(registry), ws.workspace),
   }));
   const stalest = roster.oldest(workspaces);
@@ -127,9 +131,12 @@ function describeTree(tree) {
         const built = ws.built
           ? `${ws.built.slice(0, 10)}, ${roster.describeAge(roster.ageHours(Date.parse(ws.built)))} ago`
           : "unknown";
+        const where = ws.clones.local
+          ? "local checkouts, not managed here"
+          : `${ws.clones.present}/${ws.clones.total} on disk at ${ws.clonesDir}`;
         return (
           `  ${ws.workspace}  ${ws.forge} ${ws.account}  ${holds || "empty"}  built ${built}\n` +
-          `    clones: ${ws.clones.present}/${ws.clones.total} on disk at ${ws.clonesDir}\n`
+          `    clones: ${where}\n`
         );
       })
       .join("")
@@ -180,6 +187,25 @@ function remind(registry, rest) {
   out(`reminder: on, once a tree is older than ${hours} hours\n`);
 }
 
+// How loudly the activity hook reports. The default is warn, so a healthy
+// background sync is silent: a channel that announces routine success on every
+// prompt is one people learn to skip.
+function notify(registry, rest) {
+  const value = rest[0];
+  if (value === undefined) {
+    return out(`notify: ${registry.notifyLevel() ?? "warn (default)"}\n`);
+  }
+  if (/^default$/i.test(value)) {
+    registry.setNotifyLevel(null);
+    return out("notify: warn (default)\n");
+  }
+  if (!LEVELS.includes(value)) {
+    return fail(`not a level: "${value}". One of: ${LEVELS.join(", ")}, or "default"`);
+  }
+  registry.setNotifyLevel(value);
+  out(`notify: ${value}\n`);
+}
+
 // Roster columns are named in the plural ("repos", "files"), which reads wrong
 // for a workspace holding one of something.
 function count(kind, n) {
@@ -219,7 +245,11 @@ function cloneRoots(registry, rest) {
     return fail(named ? `no workspace named "${named}"` : "no index tree on this machine");
   }
   for (const target of targets) {
-    const held = clones.held(registry, target.path, target.workspace);
+    const held = clones.held(registry, target.path, target.workspace, target.forge);
+    if (held.local) {
+      out(`${target.workspace}  local checkouts, not managed here\n`);
+      continue;
+    }
     out(
       `${target.workspace}  ${held.present}/${held.total} on disk\n` +
         `  ${join(clones.root(registry), target.workspace)}\n`,
