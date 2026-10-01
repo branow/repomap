@@ -61,19 +61,43 @@ func (c Config) Client() *http.Client {
 	return http.DefaultClient
 }
 
-// Filter drops excluded repositories and sorts the rest by name, so the
-// manifest a build works from does not depend on the order a paginated API
-// happened to answer in. Every forge ends its listing with this.
+// Filter is the gate every forge's listing leaves through. It drops excluded
+// repositories, strips any credential a clone url carries, and sorts the rest by
+// name so the manifest does not depend on the order a paginated API answered in.
 func (c Config) Filter(repos []catalog.Repo) []catalog.Repo {
 	kept := make([]catalog.Repo, 0, len(repos))
 	for _, repo := range repos {
 		if c.excluded(repo.Name) {
 			continue
 		}
+		repo.Remote = CleanRemote(repo.Remote)
 		kept = append(kept, repo)
 	}
 	sort.Slice(kept, func(i, j int) bool { return kept[i].Name < kept[j].Name })
 	return kept
+}
+
+// CleanRemote strips userinfo from an http(s) clone url.
+//
+// Bitbucket hands back "https://someone@bitbucket.org/acme/api.git". That
+// username is this machine's account, and the url is written into an index that
+// gets committed and shared - so it would leak one person's identity into
+// everybody's checkout, and show up in the argument list of every clone this
+// tool runs. An ssh url's "git@" is the transport's own fixed user, not somebody
+// in particular, and is left alone.
+func CleanRemote(remote string) string {
+	for _, scheme := range []string{"https://", "http://"} {
+		if !strings.HasPrefix(remote, scheme) {
+			continue
+		}
+		rest := remote[len(scheme):]
+		at := strings.Index(rest, "@")
+		slash := strings.Index(rest, "/")
+		if at > 0 && (slash == -1 || at < slash) {
+			return scheme + rest[at+1:]
+		}
+	}
+	return remote
 }
 
 func (c Config) excluded(name string) bool {

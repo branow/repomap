@@ -6,6 +6,7 @@ package plan
 
 import (
 	"sort"
+	"strings"
 
 	"github.com/branow/repomap/internal/catalog"
 	"github.com/branow/repomap/internal/fingerprint"
@@ -101,6 +102,44 @@ func Scan(repos []catalog.Repo, state map[string]catalog.State) ScanPlan {
 	}
 	sort.Strings(plan.Dropped)
 	return plan
+}
+
+// Match narrows the work set to repositories whose name contains substring.
+//
+// It is applied to the PLAN rather than to the manifest the plan was built from,
+// because Dropped - "the forge no longer has this" - is only knowable from a
+// complete listing. Filtering the manifest first made every row the filter
+// excluded look deleted, so `--match api` erased the rest of the catalog.
+func (p *ScanPlan) Match(substring string) {
+	if substring == "" {
+		return
+	}
+	kept := make([]catalog.Repo, 0, len(p.Scan))
+	for _, repo := range p.Scan {
+		if strings.Contains(repo.Name, substring) {
+			kept = append(kept, repo)
+			continue
+		}
+		delete(p.Reasons, repo.Key())
+	}
+	p.Scan = kept
+}
+
+// Limit caps the work set at n repositories and returns how many are left for a
+// follow-up run. It trims Scan and Reasons together: a caller that truncated the
+// slice alone would keep reporting a reason per repository it is no longer
+// scanning, which is how a capped run comes to claim 121 new repositories while
+// scanning four.
+func (p *ScanPlan) Limit(n int) int {
+	if n <= 0 || len(p.Scan) <= n {
+		return 0
+	}
+	remaining := len(p.Scan) - n
+	for _, repo := range p.Scan[n:] {
+		delete(p.Reasons, repo.Key())
+	}
+	p.Scan = p.Scan[:n]
+	return remaining
 }
 
 func reasonFor(repo catalog.Repo, prior *catalog.State) (Reason, bool) {

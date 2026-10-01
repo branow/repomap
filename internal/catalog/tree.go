@@ -48,6 +48,9 @@ func (e Entry) Key() string { return e.Repo.Key() }
 // State is what the previous build recorded about one repository, read back out
 // of the catalog that build wrote rather than from a sidecar file.
 type State struct {
+	// Remote is the clone url the previous build recorded, so a row carried
+	// forward untouched keeps the address a reader needs.
+	Remote      string
 	Activity    Signal
 	Fingerprint string
 	Description string

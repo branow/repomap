@@ -234,26 +234,48 @@ func TestANarrowedRunDoesNotCostTheNextFullOne(t *testing.T) {
 	}
 	before := client.calls
 
+	// Both repositories changed, but the run is narrowed to one. Deliberately
+	// WITHOUT Force: force empties the prior state, which is what masked a bug
+	// where a narrowed run deleted every row it did not select.
+	changed := newSource()
+	for i := range changed.repos {
+		changed.repos[i].Activity = "2026-09-28"
+	}
+	changed.trees["api"] = tree("main.go", "internal/router.go", "internal/store.go")
+	changed.trees["web"] = tree("main.go", "app.tsx", "theme.css")
+
 	narrowed := options(out)
 	narrowed.Match = "api"
-	narrowed.Force = true
-	if _, err := Build(context.Background(), newSource(), client, narrowed); err != nil {
+	if _, err := Build(context.Background(), changed, client, narrowed); err != nil {
 		t.Fatal(err)
 	}
 	if client.calls != before+1 {
 		t.Errorf("a narrowed run made %d calls, want 1", client.calls-before)
 	}
-
-	// The next full run must still find web untouched.
-	summary, err := Build(context.Background(), newSource(), client, options(out))
+	state, err := render.State(filepath.Join(out, "acme"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if summary.Reused != 2 {
-		t.Errorf("after a narrowed run, %d rows were still proved untouched, want 2", summary.Reused)
+	if len(state) != 2 {
+		t.Fatalf("a --match run left %d rows, want both", len(state))
 	}
-	if client.calls != before+1 {
-		t.Errorf("the next full run paid to redescribe %d rows", client.calls-before-1)
+	if state["web"].Description == "" {
+		t.Error("the row it did not select lost its description")
+	}
+
+	// web was never scanned, so its fingerprint is still the one from the first
+	// build - and the next full run pays for web alone, not for api again.
+	full, err := Build(context.Background(), changed, client, options(out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.calls != before+2 {
+		t.Errorf("the next full run made %d calls, want 1 (web only)", client.calls-before-1)
+	}
+	// api's row already carries the new activity stamp, so the cheap tier proves
+	// it untouched and it is never even scanned.
+	if full.Reused != 1 {
+		t.Errorf("reused = %d, want api proved untouched by the activity signal", full.Reused)
 	}
 }
 
@@ -403,5 +425,60 @@ func TestAccessIsProbedOnceNotPerRepository(t *testing.T) {
 	}
 	if src.reached != 1 {
 		t.Errorf("probed access %d times, want once for the whole run", src.reached)
+	}
+}
+
+// TestANarrowedRunNeverDropsRows pins the bug directly: "gone from the forge" is
+// only knowable from a complete listing, so a narrowed run must report nothing
+// dropped however little it selected.
+func TestANarrowedRunNeverDropsRows(t *testing.T) {
+	out := t.TempDir()
+	if _, err := Build(context.Background(), newSource(), &fakeClient{}, options(out)); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, match := range []string{"api", "web", "nothing-matches-this"} {
+		opts := options(out)
+		opts.Match = match
+		summary, err := Build(context.Background(), newSource(), &fakeClient{}, opts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if summary.Dropped != 0 {
+			t.Errorf("--match %q reported %d dropped", match, summary.Dropped)
+		}
+		state, err := render.State(filepath.Join(out, "acme"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(state) != 2 {
+			t.Fatalf("--match %q left %d rows, want 2", match, len(state))
+		}
+		for name, row := range state {
+			if row.Description == "" {
+				t.Errorf("--match %q blanked the description of %s", match, name)
+			}
+		}
+		if _, err := os.Stat(filepath.Join(out, "acme", render.FilesDir, "web.tsv")); err != nil {
+			t.Errorf("--match %q removed an inventory it did not select: %v", match, err)
+		}
+	}
+}
+
+// TestADroppedRowStillGoesWhenTheListingIsComplete: the fix must not cost the
+// behaviour it protects.
+func TestADroppedRowStillGoesWhenTheListingIsComplete(t *testing.T) {
+	out := t.TempDir()
+	if _, err := Build(context.Background(), newSource(), &fakeClient{}, options(out)); err != nil {
+		t.Fatal(err)
+	}
+	shrunk := newSource()
+	shrunk.repos = shrunk.repos[:1]
+	summary, err := Build(context.Background(), shrunk, &fakeClient{}, options(out))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Dropped != 1 {
+		t.Errorf("dropped = %d, want 1", summary.Dropped)
 	}
 }

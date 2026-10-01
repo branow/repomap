@@ -2,7 +2,7 @@
 name: repomap-build
 description: Use when a developer asks to build, update or rebuild a repository index. Runs the repomap CLI, which lists an account, pulls what moved, describes each repository with a model, and writes the index tree.
 argument-hint: [<workspace>] [--match X] [--limit N]
-allowed-tools: [Read, Bash(command -v repomap), Bash(repomap *), Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/roots.js*), Bash(awk *), Bash(tail *), Monitor, TaskStop]
+allowed-tools: [Read, Bash(command -v repomap), Bash(repomap *), Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/roots.js*), Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/publish.js*), Bash(awk *), Bash(tail *), Monitor, TaskStop]
 ---
 
 # repomap - Build
@@ -42,16 +42,22 @@ Ask if the request does not say:
   reads it; nothing to register
 - **this machine only** - `node ${CLAUDE_PLUGIN_ROOT}/scripts/roots.js add`
   prints the path and registers it
-- **published for a team** - a checkout of the repository that carries the tree;
-  commit and push it there on a branch. Teammates run
+- **published for a team** - a checkout of the repository that carries the tree.
+  Step 6 commits and pushes it. Teammates run
   `/repomap-config add --remote=<url> --subdir=<dir>` once, then
   `/repomap-config sync`
 
 ## Step 2: Plan
 
 ```bash
-repomap index [<workspace>] --out <out> --dry-run
+node ${CLAUDE_PLUGIN_ROOT}/scripts/roots.js clones
+repomap index [<workspace>] --out <out> --clones <clone dir> --dry-run
 ```
+
+`roots.js clones` prints the directory this plugin keeps clones in; pass it as
+`--clones` so the build fetches into the same place the sync maintains. Without
+it the binary uses its own cache and the machine ends up with two shallow copies
+of every repository.
 
 Reads the account listing and stops. Relay the counts in one line. Get a yes
 before Step 3 when `scan` is more than a handful - a first build of two hundred
@@ -60,7 +66,7 @@ repositories is two hundred clones and two hundred model calls.
 ## Step 3: Build, one workspace at a time
 
 ```bash
-repomap index [<workspace>] --out <out> 2> <log>
+repomap index [<workspace>] --out <out> --clones <clone dir> 2> <log>
 ```
 
 `run_in_background: true`; a first build takes minutes. Never two at once - they
@@ -84,7 +90,22 @@ re-run rather than hunting for them.
 awk -F'\t' 'NR>1 && $NF=="" {print $1}' <out>/<workspace>/repos.tsv
 ```
 
-## Step 5: Report
+## Step 5: Publish, if the tree is a published one
+
+```bash
+node ${CLAUDE_PLUGIN_ROOT}/scripts/publish.js --tree=<out> [--pr]
+```
+
+Commits the tree to a dated branch, pushes it, and with `--pr` opens a pull
+request through `gh` or `bkt`. Skip this for a tree committed with the project -
+that one belongs in the developer's own commit - and for a machine-only tree,
+which has nothing to publish to.
+
+An unchanged tree reports that and does nothing. A commit that could not be
+pushed published **nothing**: report it as a failed publish rather than a
+partial one, and name the branch it is stranded on.
+
+## Step 6: Report
 
 `node ${CLAUDE_PLUGIN_ROOT}/scripts/roots.js list` shows the tree as the
 `repomap` skill will see it. Report per workspace what was described and what it

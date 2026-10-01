@@ -6,7 +6,7 @@ allowed-tools: [Read, Glob, Grep, Bash(node ${CLAUDE_PLUGIN_ROOT}/scripts/roots.
 
 # repomap - Read
 
-Four steps against plain files. No clone, no credential, no binary.
+Reading the index is plain files: no credential, no binary, no search.
 
 ## Step 1: Locate the index
 
@@ -38,7 +38,15 @@ the ones whose purpose the path does not give away. A row with no phrase is the
 common case, not a gap. The header carries the repository's sentence, its branch
 and its last commit.
 
-## Step 4: Cross-repository questions - grep the tree
+## Step 4: Read the code
+
+Step 1 printed a clone directory and how many repositories are in it. The file
+you found in Step 3 is at `<clone dir>/<repo>/<path>` - read or grep it there.
+
+Missing, or `0/N on disk`? Use Skill(repomap-sync) to fetch it. Do not clone by
+hand: the index carries each repository's clone url and the sync uses it.
+
+## Step 5: Cross-repository questions - grep the tree
 
 A description names what a repository is, not everything in it.
 
@@ -52,7 +60,8 @@ grep -rl "Dockerfile" <WS>/files/
 
 ## Limits
 
-Structure, not content. A question about what code does, or about a repository
-newer than the build date, needs the clone - `roots.js list` prints where it is.
-If a file does not match the above, `<printed path>/README.md` is the tree's own
-format reference.
+The index is structure; the clones beside it are the content. A question about a
+repository newer than the build date needs `/repomap-build`. The clones are a
+cache this plugin resets, so never send somebody there to work - point them at
+their own checkout. If a file does not match the above, `<printed path>/README.md`
+is the tree's own format reference.

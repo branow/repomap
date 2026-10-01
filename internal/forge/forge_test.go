@@ -278,3 +278,34 @@ func names(repos []catalog.Repo) []string {
 	}
 	return out
 }
+
+// TestCleanRemoteStripsUserinfo: Bitbucket embeds this machine's own username in
+// the https clone url, and that url gets written into a committed index.
+func TestCleanRemoteStripsUserinfo(t *testing.T) {
+	tests := []struct{ in, want string }{
+		{"https://someone@bitbucket.org/acme/api.git", "https://bitbucket.org/acme/api.git"},
+		{"http://someone@git.example.internal/acme/api.git", "http://git.example.internal/acme/api.git"},
+		{"https://bitbucket.org/acme/api.git", "https://bitbucket.org/acme/api.git"},
+		// ssh's "git@" is the transport's fixed user, not a person.
+		{"git@github.com:acme/api.git", "git@github.com:acme/api.git"},
+		// An @ after the host belongs to the path, not to userinfo.
+		{"https://github.com/acme/weird@name.git", "https://github.com/acme/weird@name.git"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		if got := CleanRemote(tt.in); got != tt.want {
+			t.Errorf("CleanRemote(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
+// TestFilterIsTheGateEveryListingLeavesThrough: a forge that forgot to sanitise
+// would otherwise publish a username, so the gate does it for all of them.
+func TestFilterIsTheGateEveryListingLeavesThrough(t *testing.T) {
+	got := Config{}.Filter([]catalog.Repo{
+		{Name: "api", Remote: "https://someone@bitbucket.org/acme/api.git"},
+	})
+	if got[0].Remote != "https://bitbucket.org/acme/api.git" {
+		t.Errorf("remote left the forge as %q", got[0].Remote)
+	}
+}

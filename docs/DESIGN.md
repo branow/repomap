@@ -234,6 +234,38 @@ Access is probed **once**, before anything is cloned. The failure that matters â
 no network, no VPN, an expired key â€” fails every repository identically, and
 probing each would turn one message into two hundred.
 
+## The reader is not the builder
+
+Building needs the binary, forge access and a model backend. Reading needs none
+of them - and most of the people who ever use an index are reading one somebody
+else built. Two things follow.
+
+The catalog records each repository's **clone url**. Without it the index can say
+which repository and which file and still leave a reader with no way to open it,
+because they have no credential to list the account with. With it, fetching the
+code is `git clone` against a column, so the Claude Code plugin does that itself
+and needs neither the binary nor a token. A url the forge embedded a username in
+is stripped first: the index is committed and shared, and that username belongs
+to one person.
+
+The clones are therefore owned by the **plugin**, not the binary. The plugin
+decides the path and passes it to the binary with `--clones`, so a machine running
+both keeps one shallow copy of each repository instead of one per tool. The
+binary keeps its own default only for standalone CLI use.
+
+Cloning cannot move into the plugin entirely, which is the one thing that looks
+like it should work and does not: a first build has no index to read urls from, so
+something has to list the account, and that is the forge layer. The division is
+that the binary makes the first clone and the plugin keeps them fresh afterwards.
+
+A background sync at session start is what makes this invisible in use, and it
+brings a problem of its own: nobody is watching it. A dead SSH key then means a
+session carries on with no clones and the first anybody hears of it is an agent
+reporting that a file does not exist. So failures are written to a log and
+surfaced at the next prompt - problems by default, progress on request. That hook
+fires on every prompt, which is exactly why its threshold is `warn`: a channel
+that reports routine success is a channel people learn to skip.
+
 ## Structure
 
 Dependencies flow bottom-up; siblings do not import each other, and the domain

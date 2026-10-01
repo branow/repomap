@@ -101,6 +101,17 @@ function createRegistry(root = DEFAULT_ROOT) {
     return typeof value === "number" && value > 0 ? value : null;
   }
 
+  // The threshold the activity hook reports at, or null for the built-in default.
+  function setNotifyLevel(level) {
+    const { notifyLevel, ...rest } = readStrict();
+    write(level === null ? rest : { ...rest, notifyLevel: level });
+  }
+
+  function notifyLevel() {
+    const value = read().notifyLevel;
+    return typeof value === "string" ? value : null;
+  }
+
   return {
     root,
     file,
@@ -113,6 +124,8 @@ function createRegistry(root = DEFAULT_ROOT) {
     remove,
     setRemindAfterHours,
     remindAfterHours,
+    setNotifyLevel,
+    notifyLevel,
   };
 }
 

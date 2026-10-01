@@ -30,10 +30,12 @@ the session ends, and the next one does the same walk again.
 - **Ask in plain language.** Which repository owns checkout, what is that
   service built with, which file configures the router, what is even in this
   account — answered from the index, not from a hundred clones.
-- **Works from a Claude Code plugin.** Install it and your agent finds the
-  index, reads it, and offers to rebuild it when it goes stale.
+- **Works from a Claude Code plugin.** Install it and your agent finds the index,
+  reads it, keeps the repositories cloned for you in the background, and offers to
+  rebuild it when it goes stale.
 - **Commit it with your code.** The index is a small tree of TSV files. Whoever
-  clones the repository gets it; no setup, no binary, no credential.
+  clones the repository gets it; no setup, no binary, no credential - and it
+  records where each repository lives, so the plugin can fetch the code too.
 - **Cheap to keep current.** Two staleness tiers: the forge's activity stamp
   decides what to pull, a content fingerprint decides what to describe. A
   repository with a commit a day gets pulled and costs nothing.

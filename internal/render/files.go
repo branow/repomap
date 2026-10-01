@@ -39,7 +39,7 @@ func Files(dir string, entry catalog.Entry) error {
 	// opening the catalog beside it.
 	var head strings.Builder
 	head.WriteString("# " + entry.Key() + " @" + entry.Fingerprint + "\n")
-	head.WriteString("# " + strconv.Itoa(len(entry.Tree.Files)) + " files  " +
+	head.WriteString("# " + plural(len(entry.Tree.Files), "file") + "  " +
 		Size(entry.Tree.Bytes))
 	if entry.Tree.LastCommit != "" {
 		head.WriteString("  last commit " + entry.Tree.LastCommit)
@@ -66,4 +66,13 @@ func Prune(dir string, dropped []string) error {
 		}
 	}
 	return nil
+}
+
+// plural renders a count with its noun, so a one-file repository does not report
+// "1 files" in the header a reader sees first.
+func plural(n int, noun string) string {
+	if n == 1 {
+		return "1 " + noun
+	}
+	return strconv.Itoa(n) + " " + noun + "s"
 }

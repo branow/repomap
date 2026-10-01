@@ -79,9 +79,10 @@ func TestSSHIsPreferredOverHTTPS(t *testing.T) {
 	if got[0].Remote != "git@bitbucket.org:acme/api.git" {
 		t.Errorf("remote = %q, want the ssh url", got[0].Remote)
 	}
-	// With no ssh link, https is better than nothing.
-	if got[1].Remote != "https://user@bitbucket.org/acme/web.git" {
-		t.Errorf("remote = %q, want the https url as a fallback", got[1].Remote)
+	// With no ssh link, https is better than nothing - and Bitbucket's https url
+	// carries this machine's username, which must not reach a committed index.
+	if got[1].Remote != "https://bitbucket.org/acme/web.git" {
+		t.Errorf("remote = %q, want the https url with no userinfo", got[1].Remote)
 	}
 }
 

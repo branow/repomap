@@ -39,6 +39,7 @@ type indexOptions struct {
 	match   string
 	limit   int
 	out     string
+	clones  string
 	backend string
 	years   int
 	dryRun  bool
@@ -63,6 +64,8 @@ func newIndex(f *cmdutil.Factory) *cobra.Command {
 			"there, so rows they did not touch keep their descriptions and their " +
 			"fingerprints. The persistent --force flag rebuilds everything, " +
 			"ignoring both tiers.\n\n" +
+			"--clones says where working trees are kept, overriding the workspace's " +
+			"own setting for this run.\n\n" +
 			"Progress goes to stderr and the summary to stdout, so -o json pipes " +
 			"cleanly while a person watching the terminal sees the work. --quiet " +
 			"silences the progress.",
@@ -77,6 +80,8 @@ func newIndex(f *cmdutil.Factory) *cobra.Command {
 	flags.IntVar(&opts.limit, "limit", 0,
 		"scan at most this many repositories; 0 means all")
 	flags.StringVar(&opts.out, "out", DefaultOut, "directory the index tree is written under")
+	flags.StringVar(&opts.clones, "clones", "",
+		"where working trees are kept for this run; overrides the workspace's setting")
 	flags.StringVar(&opts.backend, "backend", "", "llm backend to describe with")
 	flags.IntVar(&opts.years, "active-years", 1,
 		"how recent a commit must be for the active view to keep a repository")
@@ -108,6 +113,13 @@ func runIndex(ctx context.Context, f *cmdutil.Factory, workspace string,
 	// was already paid for.
 	if err := writable(opts.out); err != nil {
 		return err
+	}
+
+	// A run may be told where to keep its working trees, which is how the plugin
+	// stays the single authority on that path: it passes its own directory, so one
+	// machine holds one shallow copy of each repository instead of one per tool.
+	if opts.clones != "" {
+		entry.Clones = opts.clones
 	}
 
 	secret, err := forgeSecret(f, workspace, entry)
@@ -342,6 +354,7 @@ func report(f *cmdutil.Factory, workspace, out string, summary index.Summary) er
 			output.Field{Name: "untouched", Value: summary.Reused},
 			output.Field{Name: "skipped", Value: summary.Skipped},
 			output.Field{Name: "dropped", Value: summary.Dropped},
+			output.Field{Name: "remaining", Value: summary.Remaining},
 			output.Field{Name: "reasons", Value: reasons(summary.Reasons)},
 			output.Field{Name: "describe", Value: pending(summary)},
 		)
@@ -353,6 +366,7 @@ func report(f *cmdutil.Factory, workspace, out string, summary index.Summary) er
 		output.Field{Name: "skipped", Value: summary.Skipped},
 		output.Field{Name: "dropped", Value: summary.Dropped},
 		output.Field{Name: "reasons", Value: reasons(summary.Reasons)},
+		output.Field{Name: "remaining", Value: summary.Remaining},
 		output.Field{Name: "described", Value: summary.Described},
 		output.Field{Name: "unchanged", Value: summary.Unchanged},
 		output.Field{Name: "active", Value: summary.Active},

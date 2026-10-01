@@ -53,11 +53,13 @@ func (o Options) dir() string { return filepath.Join(o.Out, o.Workspace) }
 
 // Summary is what a build did, and what it cost.
 type Summary struct {
-	Repos     int
-	Scanned   int
-	Reused    int
-	Skipped   int
-	Dropped   int
+	Repos   int
+	Scanned int
+	Reused  int
+	Skipped int
+	Dropped int
+	// Remaining is what --limit left for a follow-up run.
+	Remaining int
 	Described int
 	Unchanged int
 	// Missing counts repositories the model left without a sentence. A run that
@@ -83,7 +85,6 @@ func Build(ctx context.Context, src Source, client llm.Client, opts Options) (Su
 	if err != nil {
 		return Summary{}, err
 	}
-	repos = match(repos, opts.Match)
 	info(opts.Logger, "manifest: "+describe.Plural(len(repos), "repository", "repositories"))
 
 	state, err := render.State(dir)
@@ -94,15 +95,19 @@ func Build(ctx context.Context, src Source, client llm.Client, opts Options) (Su
 		state = map[string]catalog.State{}
 	}
 
+	// Both narrowings apply to the plan, never to the manifest: Dropped is only
+	// knowable from a complete listing.
 	scanPlan := plan.Scan(repos, state)
-	scanPlan.Scan, _ = limit(scanPlan.Scan, opts.Limit)
+	scanPlan.Match(opts.Match)
+	remaining := scanPlan.Limit(opts.Limit)
 	summary := Summary{
-		Repos:   len(repos),
-		Skipped: len(scanPlan.Skipped),
-		Dropped: len(scanPlan.Dropped),
-		Reasons: tally(scanPlan),
-		Broken:  map[string]error{},
-		DryRun:  opts.DryRun,
+		Repos:     len(repos),
+		Skipped:   len(scanPlan.Skipped),
+		Dropped:   len(scanPlan.Dropped),
+		Remaining: remaining,
+		Reasons:   tally(scanPlan),
+		Broken:    map[string]error{},
+		DryRun:    opts.DryRun,
 	}
 	info(opts.Logger, "plan: "+planLine(scanPlan))
 
@@ -266,26 +271,6 @@ func countFiles(entries []catalog.Entry) int {
 		total += len(entry.Tree.Files)
 	}
 	return total
-}
-
-func match(repos []catalog.Repo, substring string) []catalog.Repo {
-	if substring == "" {
-		return repos
-	}
-	kept := make([]catalog.Repo, 0, len(repos))
-	for _, repo := range repos {
-		if strings.Contains(repo.Name, substring) {
-			kept = append(kept, repo)
-		}
-	}
-	return kept
-}
-
-func limit(repos []catalog.Repo, n int) ([]catalog.Repo, int) {
-	if n <= 0 || len(repos) <= n {
-		return repos, 0
-	}
-	return repos[:n], len(repos) - n
 }
 
 // reachable probes one remote rather than all of them: the failure it exists to

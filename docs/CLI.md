@@ -10,7 +10,7 @@ missing value into an error instead of a hang.
   workspaces.tsv    one row per workspace: forge, account, counts, when it was built
   README.md         the layout, for whoever reads the tree
   <workspace>/
-    repos.tsv         name, files, size, commit, activity, fingerprint, description
+    repos.tsv         name, files, size, commit, remote, activity, fingerprint, description
     repos-active.tsv  the same rows, minus repositories with no commit in a year
     files/<repo>.tsv  one per repository: every tracked file, some with a phrase
 ```
@@ -22,11 +22,16 @@ installs `repomap`: `workspaces.tsv` says what is indexed and how old it is, and
 `repos.tsv` — one row per repository, with a sentence that says what it *is*:
 
 ```
-repo             files  size    commit      activity              fingerprint       description
-order-service    412    18 MB   2026-09-11  2026-09-11T08:22:01Z  8a928f2e9dabdf50  Places and tracks orders, Java and Spring Boot, publishing to Kafka.
-storefront       1204   64 MB   2026-09-27  2026-09-27T16:04:55Z  b8faf991d5fdbc5d  The customer-facing storefront, Next.js and React, calling order-service over REST.
-legacy-importer  88     3 MB    2021-04-02  2021-04-02T09:10:00Z  94141fe08d0f22c2  (archived)
+repo             files  size    commit      remote                                  activity              fingerprint       description
+order-service    412    18 MB   2026-09-11  git@example.internal:acme/order-service.git  2026-09-11T08:22:01Z  8a928f2e9dabdf50  Places and tracks orders, Java and Spring Boot, publishing to Kafka.
+storefront       1204   64 MB   2026-09-27  git@example.internal:acme/storefront.git     2026-09-27T16:04:55Z  b8faf991d5fdbc5d  The customer-facing storefront, Next.js and React, calling order-service over REST.
+legacy-importer  88     3 MB    2021-04-02  git@example.internal:acme/legacy-importer.git 2021-04-02T09:10:00Z  94141fe08d0f22c2  (archived)
 ```
+
+`remote` is what makes the tree enough to reach the code it maps: a reader who
+pulled a published index has no forge credential and no binary, and the plugin
+clones from this column alone. Any credential the forge embedded in an https url
+is stripped before it is written.
 
 A description in parentheses is not a description: it says the repository was
 listed and deliberately not described.
@@ -97,6 +102,7 @@ repomap index [workspace] [flags]
   --match string        only repositories whose name contains this substring
   --limit int           scan at most this many repositories; 0 means all
   --out string          where the index tree is written (default ".repomap")
+  --clones string       where working trees are kept for this run
   --backend string      model backend to describe with
   --active-years int    how recent a commit keeps a repository in the active view
   --dry-run             report the plan; clone nothing and make no model call
@@ -150,6 +156,21 @@ dropped       0
 reasons       moved 9, new 3
 describe      at most 12, decided by content fingerprint after the scan
 ```
+
+## Where the working trees go
+
+A build clones what it scans, shallow and single-branch, and keeps them: the
+second run fetches instead of cloning, which is most of why it is fast.
+
+They land in `<user cache>/repomap/clones/<workspace>/<repo>` unless the
+workspace sets `clones`, or the run passes `--clones`. The Claude Code plugin
+always passes its own directory, so a machine running both keeps one copy rather
+than two - and the plugin, not the binary, is the authority on that path.
+
+These are a cache the tool owns: an update is `fetch` then **`reset --hard`**, and
+a directory too broken to fetch is deleted and cloned again. Never work in one.
+A working tree the `local` forge reported is the opposite - never written to,
+because it belongs to whoever put it there.
 
 ## Checking a workspace
 

@@ -5,7 +5,22 @@
         "hooks": [
           {
             "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/sync.js --data-dir=${CLAUDE_PLUGIN_DATA} --quiet",
+            "async": true
+          },
+          {
+            "type": "command",
             "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/notify-stale.js --data-dir=${CLAUDE_PLUGIN_DATA}"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ${CLAUDE_PLUGIN_ROOT}/scripts/notify-activity.js --data-dir=${CLAUDE_PLUGIN_DATA}"
           }
         ]
       }

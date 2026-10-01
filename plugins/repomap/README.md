@@ -20,6 +20,7 @@ machine that builds.
 | Skill | For |
 |---|---|
 | `repomap` | Reading the index: which repository, which file, what an account holds |
+| `repomap-sync` | Fetching the repositories an index points at, so the code is there to read |
 | `repomap-build` | Building or refreshing an index with the repomap CLI |
 | `repomap-config` | Which indexes this machine reads, fetching a published one, the staleness reminder |
 
@@ -41,6 +42,21 @@ The last two are rows in `roots.json` in the plugin's data directory, which is
 the only state this plugin owns. Uninstalling the plugin is uninstalling
 everything it did.
 
+## Clones
+
+The index says which repository and which file; a clone is what lets you open it.
+A SessionStart hook fetches, in the background, anything older than 12 hours,
+reading each repository's clone url out of the index itself - so it needs no forge
+credential and no `repomap` binary. `/repomap-sync` fetches one now.
+
+They live under the plugin's data directory, and the build is told to use the same
+place, so a machine keeps one shallow copy of each repository rather than two.
+They are a cache this plugin resets: never work in one.
+
+A failure there is silent by construction - nobody is watching a background hook -
+so a `UserPromptSubmit` hook reports what went wrong at the next prompt. Problems
+only, by default; `REPOMAP_NOTIFY_LEVEL=info` turns progress on for a session.
+
 ## Staleness
 
 Off until asked for. `/repomap-config remind 168` reports at session start when
@@ -54,5 +70,6 @@ rebuild silences it immediately.
 npm test
 ```
 
-The registry, the roster parser, git against a real local remote, the staleness
-decision, and the wiring that is done by string rather than by import.
+The registry, the roster parser, the clone sync and publish against real local
+remotes, the alerting cursor, the staleness decision, and the wiring that is done
+by string rather than by import.

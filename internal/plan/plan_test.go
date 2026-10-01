@@ -184,3 +184,43 @@ func keys(entries []catalog.Entry) []string {
 	}
 	return out
 }
+
+// TestLimitTrimsReasonsWithTheWorkSet pins a bug a live run showed: truncating
+// Scan alone left a reason recorded for every repository the run was no longer
+// scanning, so a capped run reported "new 121" while scanning four.
+func TestLimitTrimsReasonsWithTheWorkSet(t *testing.T) {
+	var repos []catalog.Repo
+	for i := 0; i < 10; i++ {
+		repos = append(repos, repo("r"+string(rune('a'+i)), "2026-01-01"))
+	}
+	p := Scan(repos, nil)
+	if len(p.Reasons) != 10 {
+		t.Fatalf("planned %d reasons, want 10", len(p.Reasons))
+	}
+
+	remaining := p.Limit(4)
+
+	if remaining != 6 {
+		t.Errorf("remaining = %d, want 6", remaining)
+	}
+	if len(p.Scan) != 4 {
+		t.Errorf("scanning %d, want 4", len(p.Scan))
+	}
+	if len(p.Reasons) != 4 {
+		t.Errorf("%d reasons for 4 repositories: a capped run would over-report", len(p.Reasons))
+	}
+	for _, r := range p.Scan {
+		if _, ok := p.Reasons[r.Key()]; !ok {
+			t.Errorf("%s is being scanned with no reason recorded", r.Key())
+		}
+	}
+}
+
+func TestLimitOfZeroOrMoreThanAvailableKeepsEverything(t *testing.T) {
+	for _, n := range []int{0, -1, 5, 99} {
+		p := Scan([]catalog.Repo{repo("a", "x"), repo("b", "x")}, nil)
+		if got := p.Limit(n); got != 0 || len(p.Scan) != 2 || len(p.Reasons) != 2 {
+			t.Errorf("Limit(%d): remaining %d, scan %d, reasons %d", n, got, len(p.Scan), len(p.Reasons))
+		}
+	}
+}

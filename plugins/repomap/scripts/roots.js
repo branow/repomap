@@ -10,16 +10,18 @@
 //   add [<path>] [--name=N] [--remote=URL] [--subdir=REL] [--branch=B]
 //   remove <name>
 //   remind <hours> | remind off
-//   sync [<name>]
+//   sync [<name>]                    fetch the published index trees
+//   clones [<workspace>]             fetch the repositories an index points at
 //
 // `add` with no path registers this plugin's own data directory, which is where
 // a build for one person lands. `add --remote=URL` registers a published tree
 // and prints the directory `sync` will clone it into.
 
-const { basename } = require("node:path");
+const { basename, join } = require("node:path");
 const args = require("./lib/args.js");
 const git = require("./lib/git.js");
 const roster = require("./lib/roster.js");
+const clones = require("./lib/clones.js");
 const { createRegistry } = require("./lib/registry.js");
 
 const COMMANDS = {
@@ -28,6 +30,7 @@ const COMMANDS = {
   remove: drop,
   remind: remind,
   sync: sync,
+  clones: cloneRoots,
 };
 
 function main(argv) {
@@ -37,7 +40,12 @@ function main(argv) {
 
   const run = COMMANDS[command];
   if (!run) return fail(`not a command: "${command}". One of: ${Object.keys(COMMANDS).join(", ")}`);
-  run(registry, rest, flags);
+  try {
+    run(registry, rest, flags);
+  } catch (err) {
+    if (err instanceof args.UsageError) return fail(err.message);
+    throw err;
+  }
 }
 
 // Everything this machine can read, discovered tree first: it is the one the
@@ -68,20 +76,24 @@ function resolveAll(registry) {
 
   const discovered = roster.discover(process.cwd());
   if (discovered) {
-    trees.push(inspect({ name: "repo", path: discovered, origin: "repo" }));
+    trees.push(inspect({ name: "repo", path: discovered, origin: "repo" }, registry));
     seen.add(discovered);
   }
   for (const root of registry.read().roots) {
     if (seen.has(root.path)) continue;
     seen.add(root.path);
-    trees.push(inspect({ ...root, origin: root.remote ? "remote" : "local" }));
+    trees.push(inspect({ ...root, origin: root.remote ? "remote" : "local" }, registry));
   }
   return { cwd: process.cwd(), trees };
 }
 
-function inspect(root) {
+function inspect(root, registry) {
   const present = roster.isTree(root.path);
-  const workspaces = present ? roster.workspaces(root.path) : [];
+  const workspaces = (present ? roster.workspaces(root.path) : []).map((ws) => ({
+    ...ws,
+    clones: clones.held(registry, root.path, ws.workspace),
+    clonesDir: join(clones.root(registry), ws.workspace),
+  }));
   const stalest = roster.oldest(workspaces);
   return {
     ...root,
@@ -112,11 +124,13 @@ function describeTree(tree) {
         const holds = Object.entries(ws.counts)
           .map(([kind, n]) => `${n} ${count(kind, n)}`)
           .join(", ");
-        return `  ${ws.workspace}  ${ws.forge} ${ws.account}  ${holds || "empty"}  built ${
-          ws.built
-            ? `${ws.built.slice(0, 10)}, ${roster.describeAge(roster.ageHours(Date.parse(ws.built)))} ago`
-            : "unknown"
-        }\n`;
+        const built = ws.built
+          ? `${ws.built.slice(0, 10)}, ${roster.describeAge(roster.ageHours(Date.parse(ws.built)))} ago`
+          : "unknown";
+        return (
+          `  ${ws.workspace}  ${ws.forge} ${ws.account}  ${holds || "empty"}  built ${built}\n` +
+          `    clones: ${ws.clones.present}/${ws.clones.total} on disk at ${ws.clonesDir}\n`
+        );
       })
       .join("")
   );
@@ -126,16 +140,16 @@ function describeTree(tree) {
 // readable, and it is deliberately the same command for both kinds: a directory
 // somebody built into, and a git repository somebody publishes.
 function add(registry, rest, flags) {
-  const remote = typeof flags.remote === "string" ? flags.remote : null;
-  const name = typeof flags.name === "string" ? flags.name : remote ? repoName(remote) : "local";
+  const remote = args.value(flags, "remote");
+  const name = args.value(flags, "name") ?? (remote ? repoName(remote) : "local");
   const path = rest[0] || (remote ? registry.clonePath(name) : registry.localTreePath());
 
   const entry = registry.add({
     name,
     path,
     remote,
-    subdir: typeof flags.subdir === "string" ? flags.subdir : null,
-    branch: typeof flags.branch === "string" ? flags.branch : null,
+    subdir: args.value(flags, "subdir"),
+    branch: args.value(flags, "branch"),
   });
 
   out(`registered ${entry.name}\n  tree: ${entry.path}\n`);
@@ -191,6 +205,25 @@ function sync(registry, rest) {
     if (!roster.isTree(root.path)) {
       out(`  no index at ${root.path}; the --subdir is wrong for this repository\n`);
     }
+  }
+}
+
+// Reports where the clones are and how many are there. Fetching them is sync.js,
+// which the session-start hook also runs, so there is one implementation of it.
+function cloneRoots(registry, rest) {
+  const named = rest[0];
+  const targets = clones.workspacesOf(resolveAll(registry).trees).filter(
+    (t) => !named || t.workspace === named,
+  );
+  if (targets.length === 0) {
+    return fail(named ? `no workspace named "${named}"` : "no index tree on this machine");
+  }
+  for (const target of targets) {
+    const held = clones.held(registry, target.path, target.workspace);
+    out(
+      `${target.workspace}  ${held.present}/${held.total} on disk\n` +
+        `  ${join(clones.root(registry), target.workspace)}\n`,
+    );
   }
 }
 

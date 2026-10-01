@@ -33,8 +33,12 @@ const FilesDir = "files"
 // catalogHeader is the catalog's columns. `activity` and `fingerprint` are
 // build state living in the catalog rather than in a sidecar, because a
 // parallel state file drifts out of step with the index beside it.
+// `remote` is here so the tree is enough to REACH the code it maps. A reader who
+// pulled a published index has no forge credential and no binary, and without
+// the clone url the index can say which file to open and still leave them with
+// no way to open it.
 var catalogHeader = []string{
-	"repo", "files", "size", "commit", "activity", "fingerprint", "description",
+	"repo", "files", "size", "commit", "remote", "activity", "fingerprint", "description",
 }
 
 // Catalog writes the workspace catalog, MERGING entries into whatever the file
@@ -90,6 +94,7 @@ func row(entry catalog.Entry) []string {
 		strconv.Itoa(len(entry.Tree.Files)),
 		Size(entry.Tree.Bytes),
 		entry.Tree.LastCommit,
+		entry.Repo.Remote,
 		entry.Repo.Activity.String(),
 		entry.Fingerprint,
 		description,
@@ -107,9 +112,10 @@ func State(dir string) (map[string]catalog.State, error) {
 	state := make(map[string]catalog.State, len(rows))
 	for name, cells := range rows {
 		entry := catalog.State{
-			Activity:    catalog.Signal(cell(cells, 4)),
-			Fingerprint: cell(cells, 5),
-			Description: cell(cells, 6),
+			Remote:      cell(cells, 4),
+			Activity:    catalog.Signal(cell(cells, 5)),
+			Fingerprint: cell(cells, 6),
+			Description: cell(cells, 7),
 		}
 		// A skipped row's placeholder is not a description: reading it back as
 		// one would make an archived repository look described, and a repository

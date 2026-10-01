@@ -285,3 +285,33 @@ func TestAMissingTreeIsNotAFailure(t *testing.T) {
 		t.Error("an unbuilt tree produced state")
 	}
 }
+
+// TestTheCatalogRecordsWhereTheCodeIs: without the clone url a reader who pulled
+// a published index can be told which file to open and still have no way to open
+// it, because they have no forge credential and no binary.
+func TestTheCatalogRecordsWhereTheCodeIs(t *testing.T) {
+	dir := t.TempDir()
+	e := entry("api", "the api", "2026-01-01", "main.go")
+	e.Repo.Remote = "git@example.internal:acme/api.git"
+
+	if _, err := Catalog(dir, []catalog.Entry{e}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if body := read(t, filepath.Join(dir, CatalogFile)); !strings.Contains(body, e.Repo.Remote) {
+		t.Errorf("the clone url is not in the catalog:\n%s", body)
+	}
+	state, err := State(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state["api"].Remote != e.Repo.Remote {
+		t.Errorf("remote read back as %q", state["api"].Remote)
+	}
+	// A row carried forward untouched must keep it.
+	if _, err := Catalog(dir, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if again, _ := State(dir); again["api"].Remote != e.Repo.Remote {
+		t.Error("a merge dropped the clone url")
+	}
+}
