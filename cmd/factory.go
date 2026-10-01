@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/branow/llm"
-	"github.com/branow/llm/provider"
+	"github.com/branow/gollm"
+	"github.com/branow/gollm/provider"
 	"github.com/branow/repomap/internal/clone"
 	"github.com/branow/repomap/internal/cmdutil"
 	"github.com/branow/repomap/internal/config"
@@ -67,7 +67,7 @@ func verifyBackend(ctx context.Context, name string, entry config.Backend,
 
 	ctx, cancel := context.WithTimeout(ctx, backendProbeTimeout)
 	defer cancel()
-	_, err = client.Complete(ctx, llm.Request{
+	_, err = client.Complete(ctx, gollm.Request{
 		Prompt: "Reply with the word ok.",
 		Schema: json.RawMessage(`{"type":"object","additionalProperties":false,` +
 			`"required":["ok"],"properties":{"ok":{"type":"string"}}}`),
@@ -77,8 +77,8 @@ func verifyBackend(ctx context.Context, name string, entry config.Backend,
 }
 
 // newClient builds the model client one backend entry names.
-func newClient(entry config.Backend, secret credentials.Secret) (llm.Client, error) {
-	return provider.New(llm.Config{
+func newClient(entry config.Backend, secret credentials.Secret) (gollm.Client, error) {
+	return provider.New(gollm.Config{
 		Provider: string(entry.Provider),
 		Model:    entry.Model,
 		BaseURL:  entry.BaseURL,

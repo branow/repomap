@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/branow/llm"
+	"github.com/branow/gollm"
 	"github.com/branow/repomap/internal/cmdutil"
 	"github.com/branow/repomap/internal/config"
 	"github.com/branow/repomap/internal/credentials"
@@ -230,7 +230,7 @@ func forgeSecret(f *cmdutil.Factory, workspace string,
 	return f.Store.Get(credentials.ForgeKey(workspace))
 }
 
-// describer assembles the model client for this build behind the llm module's
+// describer assembles the model client for this build behind the gollm module's
 // own middleware, and returns the total it meters into. A dry run is the only
 // build allowed to run without a client.
 //
@@ -240,7 +240,7 @@ func forgeSecret(f *cmdutil.Factory, workspace string,
 // does not, because it was paid for on an earlier run. Metering outside the
 // cache is how a resumed build reports money it did not spend.
 func describer(f *cmdutil.Factory, opts *indexOptions,
-	cache string) (llm.Client, string, *llm.Usage, error) {
+	cache string) (gollm.Client, string, *gollm.Usage, error) {
 	if opts.dryRun {
 		return nil, "", nil, nil
 	}
@@ -262,11 +262,11 @@ func describer(f *cmdutil.Factory, opts *indexOptions,
 		return nil, "", nil, err
 	}
 
-	spend := &llm.Usage{}
-	client = llm.WithUsage(client, spend)
-	client = llm.WithRetry(client, llm.RetryConfig{})
-	client = llm.WithCache(client, filepath.Join(cache, "llm"))
-	return llm.WithConcurrency(client, Concurrency), entry.Model, spend, nil
+	spend := &gollm.Usage{}
+	client = gollm.WithUsage(client, spend)
+	client = gollm.WithRetry(client, gollm.RetryConfig{})
+	client = gollm.WithCache(client, filepath.Join(cache, "llm"))
+	return gollm.WithConcurrency(client, Concurrency), entry.Model, spend, nil
 }
 
 // resolveBackend answers which backend describes: --backend first, the active

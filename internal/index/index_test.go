@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/branow/llm"
+	"github.com/branow/gollm"
 	"github.com/branow/repomap/internal/catalog"
 	"github.com/branow/repomap/internal/describe"
 	"github.com/branow/repomap/internal/render"
@@ -66,7 +66,7 @@ type fakeClient struct {
 
 func (c *fakeClient) Name() string { return "fake" }
 
-func (c *fakeClient) Complete(_ context.Context, request llm.Request) (*llm.Response, error) {
+func (c *fakeClient) Complete(_ context.Context, request gollm.Request) (*gollm.Response, error) {
 	c.mu.Lock()
 	c.calls++
 	c.mu.Unlock()
@@ -83,7 +83,7 @@ func (c *fakeClient) Complete(_ context.Context, request llm.Request) (*llm.Resp
 		Files:    []describe.FileAnswer{{Path: "main.go", Purpose: "process entry point"}},
 	}
 	body, _ := json.Marshal(answer)
-	return &llm.Response{Structured: body, Usage: llm.Usage{InputTokens: 10}}, nil
+	return &gollm.Response{Structured: body, Usage: gollm.Usage{InputTokens: 10}}, nil
 }
 
 func repoOf(prompt string) string {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/branow/llm"
+	"github.com/branow/gollm"
 	"github.com/branow/repomap/internal/clone"
 	"github.com/branow/repomap/internal/config"
 	"github.com/branow/repomap/internal/credentials"
@@ -78,7 +78,7 @@ var rules = []struct {
 
 	{ExitAuth, as[*AuthError]},
 	{ExitAuth, as[*forge.AuthError]},
-	{ExitAuth, llmClass(llm.ClassAuth)},
+	{ExitAuth, llmClass(gollm.ClassAuth)},
 
 	{ExitNotFound, as[*NotConfiguredError]},
 	{ExitNotFound, as[*config.NotFoundError]},
@@ -95,8 +95,8 @@ var rules = []struct {
 	{ExitUnavailable, as[*clone.CloneError]},
 	{ExitUnavailable, as[*clone.UpdateError]},
 	{ExitUnavailable, as[*git.MissingError]},
-	{ExitUnavailable, llmClass(llm.ClassRateLimited)},
-	{ExitUnavailable, llmClass(llm.ClassUnavailable)},
+	{ExitUnavailable, llmClass(gollm.ClassRateLimited)},
+	{ExitUnavailable, llmClass(gollm.ClassUnavailable)},
 }
 
 // ExitCode is the single translation from an error to a process exit status.
@@ -122,11 +122,11 @@ func as[T error](err error) bool {
 }
 
 // llmClass matches a provider failure by its class, never by its message: the
-// llm module classifies these precisely so nothing above it has to guess from
+// gollm module classifies these precisely so nothing above it has to guess from
 // a provider's prose.
-func llmClass(class llm.Class) func(error) bool {
+func llmClass(class gollm.Class) func(error) bool {
 	return func(err error) bool {
-		var target *llm.Error
+		var target *gollm.Error
 		return errors.As(err, &target) && target.Class == class
 	}
 }

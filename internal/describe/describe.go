@@ -10,7 +10,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/branow/llm"
+	"github.com/branow/gollm"
 	"github.com/branow/repomap/internal/catalog"
 )
 
@@ -34,7 +34,7 @@ type Result struct {
 	// repository, never fatal: one repository the provider choked on must not
 	// discard the other two hundred a run already paid for.
 	Failed map[string]error
-	Usage  llm.Usage
+	Usage  gollm.Usage
 }
 
 // Logger reports progress and what was skipped.
@@ -62,7 +62,7 @@ func (o Options) workers() int {
 // Run describes every entry, concurrently, and returns the answers keyed by
 // repository name. The order results are merged in does not depend on which
 // call finished first.
-func Run(ctx context.Context, client llm.Client, entries []catalog.Entry,
+func Run(ctx context.Context, client gollm.Client, entries []catalog.Entry,
 	opts Options) (Result, error) {
 
 	result := Result{
@@ -76,7 +76,7 @@ func Run(ctx context.Context, client llm.Client, entries []catalog.Entry,
 	type outcome struct {
 		key    string
 		answer Answer
-		usage  llm.Usage
+		usage  gollm.Usage
 		err    error
 		empty  bool
 	}
@@ -146,17 +146,17 @@ func Run(ctx context.Context, client llm.Client, entries []catalog.Entry,
 // ASKED about, so a model that renames the repository in its reply cannot file
 // a sentence under a name nothing requested - the failure mode where an object
 // counts as described while itself reporting missing.
-func one(ctx context.Context, client llm.Client, entry catalog.Entry,
-	model string) (Answer, llm.Usage, error) {
+func one(ctx context.Context, client gollm.Client, entry catalog.Entry,
+	model string) (Answer, gollm.Usage, error) {
 
-	response, err := client.Complete(ctx, llm.Request{
+	response, err := client.Complete(ctx, gollm.Request{
 		System: System,
 		Prompt: Prompt(entry),
 		Schema: Schema,
 		Model:  model,
 	})
 	if err != nil {
-		return Answer{}, llm.Usage{}, err
+		return Answer{}, gollm.Usage{}, err
 	}
 
 	var answer Answer

@@ -118,9 +118,9 @@ go test ./...
 ```
 
 The one structured-output call per repository goes through
-[github.com/branow/llm](https://github.com/branow/llm), a separate module that
-covers the Anthropic API, any OpenAI-compatible endpoint, and the Claude Code
-CLI behind one interface.
+[github.com/branow/gollm](https://github.com/branow/gollm), a separate module
+that covers the Anthropic API, any OpenAI-compatible endpoint, and the Claude
+Code CLI behind one interface.
 
 ## License
 

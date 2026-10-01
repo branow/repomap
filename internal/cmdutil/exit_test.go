@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/branow/llm"
+	"github.com/branow/gollm"
 	"github.com/branow/repomap/internal/clone"
 	"github.com/branow/repomap/internal/config"
 	"github.com/branow/repomap/internal/credentials"
@@ -53,7 +53,7 @@ func TestExitCode(t *testing.T) {
 			err:  &forge.AuthError{Forge: "bitbucket", Slug: "example", Status: 401},
 			want: ExitAuth},
 		{name: "model rejected the key",
-			err:  &llm.Error{Class: llm.ClassAuth},
+			err:  &gollm.Error{Class: gollm.ClassAuth},
 			want: ExitAuth},
 		{name: "not configured", err: &NotConfiguredError{What: "current profile"},
 			want: ExitNotFound},
@@ -91,10 +91,10 @@ func TestExitCode(t *testing.T) {
 			want: ExitUnavailable},
 		{name: "git is not installed", err: &git.MissingError{}, want: ExitUnavailable},
 		{name: "model rate limited",
-			err:  &llm.Error{Class: llm.ClassRateLimited},
+			err:  &gollm.Error{Class: gollm.ClassRateLimited},
 			want: ExitUnavailable},
 		{name: "model unavailable",
-			err:  &llm.Error{Class: llm.ClassUnavailable},
+			err:  &gollm.Error{Class: gollm.ClassUnavailable},
 			want: ExitUnavailable},
 	}
 	for _, tt := range tests {

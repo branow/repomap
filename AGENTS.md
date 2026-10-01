@@ -8,7 +8,7 @@ re-derive a constant that already has a stated justification.
 ## Stack
 
 Go, one module: `github.com/branow/repomap`. Cobra for the CLI. The one model call
-per repository goes through `github.com/branow/llm`, a separate module.
+per repository goes through `github.com/branow/gollm`, a separate module.
 
 Dependencies are **pinned**. Never run a bare `go get`, never upgrade a pin as a side
 effect. `go mod tidy` is fine once your code has imports. If you genuinely need a new
@@ -19,8 +19,9 @@ go build ./... && go vet ./... && go test ./...
 gofmt -l .        # must print nothing
 ```
 
-`go.work` is local development only and is never committed: it points the build at a
-sibling checkout of `github.com/branow/llm` before that module is tagged.
+`gollm` is a released dependency like any other: pinned in `go.mod`, resolved from
+the module proxy. There is no workspace file, and a clean clone builds with nothing
+checked out beside it.
 
 ## Non-negotiables
 
@@ -88,13 +89,13 @@ first word, no body, no attribution or co-author line.
 ## Scope
 
 If a change you need falls outside what you were asked to do - a dependency, a `go.mod`
-edit, a change to the `llm` module, a rename that ripples - stop and report it rather
+edit, a change to the `gollm` module, a rename that ripples - stop and report it rather
 than making it. When several agents work at once, each edits only its assigned paths and
 reports anything it needs elsewhere.
 
 ## Never commit
 
-Any `config.yml`, any `credentials.yml`, any `*.local.*`, `go.work`, the `.repomap/`
+Any `config.yml`, any `credentials.yml`, any `*.local.*`, the `.repomap/`
 output tree, a clone this tool made, build output, or a file containing a real
 credential. `.gitignore` is allowlist-style (deny-by-default) - do not add a rule that
 tracks these.

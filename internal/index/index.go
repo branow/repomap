@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/branow/llm"
+	"github.com/branow/gollm"
 	"github.com/branow/repomap/internal/catalog"
 	"github.com/branow/repomap/internal/describe"
 	"github.com/branow/repomap/internal/plan"
@@ -72,13 +72,13 @@ type Summary struct {
 	Broken  map[string]error
 	Written int
 	Active  int
-	Usage   llm.Usage
+	Usage   gollm.Usage
 	DryRun  bool
 	Reasons map[string]int
 }
 
 // Build runs one workspace's index end to end.
-func Build(ctx context.Context, src Source, client llm.Client, opts Options) (Summary, error) {
+func Build(ctx context.Context, src Source, client gollm.Client, opts Options) (Summary, error) {
 	dir := opts.dir()
 
 	repos, err := src.Repositories(ctx)

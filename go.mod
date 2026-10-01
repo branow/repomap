@@ -3,7 +3,7 @@ module github.com/branow/repomap
 go 1.26.0
 
 require (
-	github.com/branow/llm v0.1.0
+	github.com/branow/gollm v0.1.0
 	github.com/spf13/cobra v1.10.2
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/term v0.46.0

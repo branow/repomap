@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/branow/llm"
+	"github.com/branow/gollm"
 	"github.com/branow/repomap/internal/catalog"
 )
 
@@ -22,7 +22,7 @@ type fake struct {
 	peak     int
 }
 
-func (f *fake) Complete(ctx context.Context, request llm.Request) (*llm.Response, error) {
+func (f *fake) Complete(ctx context.Context, request gollm.Request) (*gollm.Response, error) {
 	f.mu.Lock()
 	f.calls++
 	f.inFlight++
@@ -41,7 +41,7 @@ func (f *fake) Complete(ctx context.Context, request llm.Request) (*llm.Response
 		return nil, err
 	}
 	body, _ := json.Marshal(answer)
-	return &llm.Response{Structured: body, Usage: llm.Usage{InputTokens: 10, OutputTokens: 5}}, nil
+	return &gollm.Response{Structured: body, Usage: gollm.Usage{InputTokens: 10, OutputTokens: 5}}, nil
 }
 
 func (f *fake) Name() string { return "fake" }
