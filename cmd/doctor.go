@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -128,6 +129,13 @@ func forgeCheck(_ context.Context, p *preflight) (string, error) {
 }
 
 // listing is the cheapest real call there is: ask what repositories exist.
+//
+// An empty answer from a remote forge is a FAILURE, not a quiet pass. Bitbucket
+// answers a private workspace you cannot see with HTTP 200 and an empty list
+// rather than a 401, so every check passed, doctor exited 0, and the next step
+// was a successful build of an index of nothing. An account that genuinely holds
+// no repositories is indistinguishable from one you cannot read - and of the
+// two, the one worth reporting is the one you can fix.
 func listing(ctx context.Context, p *preflight) (string, error) {
 	repos, err := p.source.Repositories(ctx)
 	if err != nil {
@@ -135,9 +143,29 @@ func listing(ctx context.Context, p *preflight) (string, error) {
 	}
 	p.repos = repos
 	if len(repos) == 0 {
-		return "the account answered, and holds no repositories", nil
+		return "", emptyListing(p.entry)
 	}
 	return strconv.Itoa(len(repos)) + " repositories listed", nil
+}
+
+// emptyListing names the two things that actually cause one, in the order they
+// are worth checking.
+func emptyListing(entry config.Workspace) error {
+	if !config.Remote(entry.Forge) {
+		return &cmdutil.ValidationError{Field: "--dir", Value: entry.Dir,
+			Reason: "holds no git checkouts"}
+	}
+	fix := "check the account name, and that this workspace has a token"
+	if entry.Auth == config.None {
+		fix = "a private account answers an unauthenticated listing with an empty " +
+			"one rather than refusing it; add a token with `repomap workspace add " +
+			"--auth token`"
+	}
+	return &cmdutil.ValidationError{
+		Field:  "slug",
+		Value:  entry.Slug,
+		Reason: "the forge listed no repositories under it: " + fix,
+	}
 }
 
 // cloneCheck probes one remote rather than cloning it. The failure it exists to
@@ -153,7 +181,16 @@ func cloneCheck(ctx context.Context, p *preflight) (string, error) {
 		}
 		return "git reached " + repo.Remote, nil
 	}
-	return "nothing to clone: these working trees are already on this machine", nil
+	// Only the local forge legitimately has nothing to clone. A remote one that
+	// listed repositories but offered no clone url for any of them is a forge
+	// this tool read wrongly, not a tree already on disk.
+	if !config.Remote(p.entry.Forge) {
+		return "nothing to clone: these working trees are already on this machine", nil
+	}
+	return "", &cmdutil.UnavailableError{
+		Subject: string(p.entry.Forge),
+		Err:     errors.New("it listed repositories but no clone url for any of them"),
+	}
 }
 
 // backendCheck resolves the backend without calling it. A model call here would

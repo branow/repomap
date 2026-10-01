@@ -51,8 +51,16 @@ func verifyWorkspace(ctx context.Context, name string, entry config.Workspace,
 		return err
 	}
 	defer source.Close()
-	_, err = source.Repositories(ctx)
-	return err
+	repos, err := source.Repositories(ctx)
+	if err != nil {
+		return err
+	}
+	// An empty listing is how a forge reports an account you cannot read, so
+	// storing the workspace on one would store a configuration that cannot work.
+	if len(repos) == 0 {
+		return emptyListing(entry)
+	}
+	return nil
 }
 
 // verifyBackend is the cheapest real proof that a backend answers: build the

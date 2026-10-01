@@ -86,6 +86,11 @@ func Build(ctx context.Context, src Source, client gollm.Client, opts Options) (
 		return Summary{}, err
 	}
 	info(opts.Logger, "manifest: "+describe.Plural(len(repos), "repository", "repositories"))
+	if len(repos) == 0 {
+		warn(opts.Logger, "the forge listed no repositories: a private account answers "+
+			"an unauthenticated listing with an empty one rather than refusing it, so "+
+			"check the account name and the token with `repomap doctor`")
+	}
 
 	state, err := render.State(dir)
 	if err != nil {
