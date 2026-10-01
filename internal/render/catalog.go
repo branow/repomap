@@ -59,7 +59,7 @@ func Catalog(dir string, entries []catalog.Entry, dropped []string) (int, error)
 	}
 	rows := migrate(table)
 	for _, entry := range entries {
-		rows[entry.Key()] = row(entry)
+		rows[entry.Key()] = row(entry, rows[entry.Key()], table)
 	}
 	for _, key := range dropped {
 		delete(rows, key)
@@ -103,23 +103,58 @@ func migrate(table Table) map[string][]string {
 	return rows
 }
 
-func row(entry catalog.Entry) []string {
+// row renders one entry, carrying forward the columns only a scan can produce
+// when this run did not scan this repository.
+//
+// A repository the activity signal proved untouched, and one skipped as
+// archived, both arrive with no tree - there was nothing to read. Rendering
+// their file count, size and last commit from that empty tree wrote 0, 0 B and
+// an empty date over three columns that were correct, on every merge. The empty
+// date was the worst of the three: an undated row is deliberately kept in the
+// active view, so the view quietly filled up with repositories nobody had
+// touched in four years.
+func row(entry catalog.Entry, prior []string, table Table) []string {
 	description := entry.Description
 	if entry.Skip != "" {
 		// A skipped repository says so in the column a reader looks at, rather
 		// than leaving a blank that is indistinguishable from a failed describe.
 		description = "(" + entry.Skip + ")"
 	}
+
+	files := strconv.Itoa(len(entry.Tree.Files))
+	size := Size(entry.Tree.Bytes)
+	commit := entry.Tree.LastCommit
+	if !entry.Scanned() && prior != nil {
+		files = table.At(prior, "files")
+		size = table.At(prior, "size")
+		commit = table.At(prior, "commit")
+	}
+
 	return []string{
 		entry.Key(),
-		strconv.Itoa(len(entry.Tree.Files)),
-		Size(entry.Tree.Bytes),
-		entry.Tree.LastCommit,
+		files,
+		size,
+		commit,
 		entry.Repo.Remote,
 		entry.Repo.Activity.String(),
 		entry.Fingerprint,
 		description,
 	}
+}
+
+// FileTotal sums the file counts the catalog records, so the roster reports the
+// whole workspace rather than whatever one run happened to scan.
+func FileTotal(dir string) (int, error) {
+	table, err := readCatalog(filepath.Join(dir, CatalogFile))
+	if err != nil {
+		return 0, err
+	}
+	total := 0
+	for _, cells := range table.Rows {
+		n, _ := strconv.Atoi(table.At(cells, "files"))
+		total += n
+	}
+	return total, nil
 }
 
 // State reads back what the previous build recorded, from the files it wrote.

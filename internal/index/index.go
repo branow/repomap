@@ -201,13 +201,19 @@ func Build(ctx context.Context, src Source, client gollm.Client, opts Options) (
 	if err := render.WriteGuide(opts.Out); err != nil {
 		return summary, err
 	}
+	// Every count in the roster is read back out of the catalog, so a narrowed
+	// run reports the workspace rather than its own slice of it.
+	files, err := render.FileTotal(dir)
+	if err != nil {
+		return summary, err
+	}
 	return summary, render.WriteRoster(opts.Out, render.Roster{
 		Workspace: opts.Workspace,
 		Forge:     src.Forge(),
 		Slug:      src.Slug(),
 		Repos:     total,
 		Active:    active,
-		Files:     countFiles(written),
+		Files:     files,
 		Built:     opts.now(),
 	})
 }
@@ -231,9 +237,9 @@ func writeTree(dir string, entries []catalog.Entry, dropped []string) error {
 	return render.Prune(filesDir, dropped)
 }
 
-// reused carries the previous build's row forward untouched for a repository
-// the signal proved unchanged, so a merge writes what was there rather than a
-// blank row.
+// reused carries a repository the signal proved untouched into the write, so its
+// row keeps the description and fingerprint already earned. The columns a scan
+// fills are preserved by the writer, which can see the row that is already there.
 func reused(repos []catalog.Repo, state map[string]catalog.State) []catalog.Entry {
 	out := make([]catalog.Entry, 0, len(repos))
 	for _, repo := range repos {
@@ -263,14 +269,6 @@ func skipped(repos []catalog.Repo, state map[string]catalog.State) []catalog.Ent
 		out = append(out, entry)
 	}
 	return out
-}
-
-func countFiles(entries []catalog.Entry) int {
-	total := 0
-	for _, entry := range entries {
-		total += len(entry.Tree.Files)
-	}
-	return total
 }
 
 // reachable probes one remote rather than all of them: the failure it exists to

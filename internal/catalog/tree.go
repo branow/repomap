@@ -45,6 +45,12 @@ type Entry struct {
 
 func (e Entry) Key() string { return e.Repo.Key() }
 
+// Scanned reports whether this run actually read a working tree for the entry.
+// A repository the activity signal proved untouched, and one skipped as
+// archived, both carry none - so the columns only a scan can fill must come from
+// what the previous build wrote rather than from this empty tree.
+func (e Entry) Scanned() bool { return e.Tree.Head != "" }
+
 // State is what the previous build recorded about one repository, read back out
 // of the catalog that build wrote rather than from a sidecar file.
 type State struct {

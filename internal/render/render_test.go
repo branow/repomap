@@ -387,3 +387,109 @@ func TestOneBuildBringsAnOlderTreeCurrent(t *testing.T) {
 		t.Errorf("the fresh row lost its remote: %q", state["fresh"].Remote)
 	}
 }
+
+// TestAnUnscannedRowKeepsItsScanColumns pins a bug a live run showed. A
+// repository the activity signal proved untouched arrives with no tree, and
+// rendering its file count, size and commit from that empty tree wrote 0, 0 B
+// and an empty date over three correct columns - on every merge. The empty date
+// was the worst: an undated row is deliberately kept in the active view, so the
+// view filled up with repositories nobody had touched in years.
+func TestAnUnscannedRowKeepsItsScanColumns(t *testing.T) {
+	dir := t.TempDir()
+	scanned := entry("api", "the api", "2022-01-01", "main.go", "router.go")
+	scanned.Tree.Head = "abc123"
+	scanned.Repo.Remote = "git@example.internal:acme/api.git"
+	if _, err := Catalog(dir, []catalog.Entry{scanned}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	// A later run proves it untouched: same repo, no tree read.
+	untouched := catalog.Entry{
+		Repo:        scanned.Repo,
+		Fingerprint: "hash-api",
+		Description: "the api",
+	}
+	if untouched.Scanned() {
+		t.Fatal("an entry with no tree reports itself scanned")
+	}
+	if _, err := Catalog(dir, []catalog.Entry{untouched}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	table, err := readCatalog(filepath.Join(dir, CatalogFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cells := table.Rows["api"]
+	for _, c := range []struct{ column, want string }{
+		{"files", "2"}, {"size", "2 KB"}, {"commit", "2022-01-01"},
+	} {
+		if got := table.At(cells, c.column); got != c.want {
+			t.Errorf("%s = %q after a merge that did not scan, want %q", c.column, got, c.want)
+		}
+	}
+}
+
+// TestTheActiveViewSurvivesAMerge is the consequence that made the bug visible:
+// a blanked commit date is an undated row, and an undated row is kept.
+func TestTheActiveViewSurvivesAMerge(t *testing.T) {
+	dir := t.TempDir()
+	now := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+
+	old := entry("ancient", "untouched since 2022", "2022-01-01", "main.go")
+	old.Tree.Head = "abc123"
+	fresh := entry("current", "worked on", "2026-09-01", "main.go")
+	fresh.Tree.Head = "def456"
+	if _, err := Catalog(dir, []catalog.Entry{old, fresh}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if kept, _, err := Active(dir, 1, now); err != nil || kept != 1 {
+		t.Fatalf("first build kept %d, want 1 (err %v)", kept, err)
+	}
+
+	// Both proved untouched by the cheap tier on a later run.
+	carried := []catalog.Entry{
+		{Repo: old.Repo, Fingerprint: "hash-ancient", Description: "untouched since 2022"},
+		{Repo: fresh.Repo, Fingerprint: "hash-current", Description: "worked on"},
+	}
+	if _, err := Catalog(dir, carried, nil); err != nil {
+		t.Fatal(err)
+	}
+	kept, total, err := Active(dir, 1, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 2 || kept != 1 {
+		t.Errorf("after a merge the active view kept %d of %d, want 1 of 2", kept, total)
+	}
+}
+
+// TestFileTotalCountsTheWorkspace: the roster's repos and active counts come
+// from the whole catalog, so its file count has to as well or a narrowed run
+// reports three numbers that disagree.
+func TestFileTotalCountsTheWorkspace(t *testing.T) {
+	dir := t.TempDir()
+	a := entry("api", "the api", "2026-01-01", "main.go", "router.go")
+	a.Tree.Head = "a"
+	b := entry("web", "the web app", "2026-01-01", "app.tsx")
+	b.Tree.Head = "b"
+	if _, err := Catalog(dir, []catalog.Entry{a, b}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	total, err := FileTotal(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if total != 3 {
+		t.Errorf("FileTotal = %d, want 3", total)
+	}
+
+	// A narrowed run that touched only one of them still totals both.
+	if _, err := Catalog(dir, []catalog.Entry{a}, nil); err != nil {
+		t.Fatal(err)
+	}
+	if total, _ := FileTotal(dir); total != 3 {
+		t.Errorf("after a narrowed run FileTotal = %d, want 3", total)
+	}
+}
