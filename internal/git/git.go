@@ -144,6 +144,22 @@ func IsRepo(ctx context.Context, r Runner, dir string) bool {
 	return err == nil && out == "true"
 }
 
+// Heads lists a remote's branches without cloning it. An empty result from a
+// remote that answered is a repository with no commits yet.
+func Heads(ctx context.Context, r Runner, remote string) ([]string, error) {
+	out, err := r.Run(ctx, "", "ls-remote", "--heads", "--", remote)
+	if err != nil {
+		return nil, err
+	}
+	var heads []string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.TrimSpace(line) != "" {
+			heads = append(heads, line)
+		}
+	}
+	return heads, nil
+}
+
 // Reachable probes a remote without cloning it, so a whole run can fail once,
 // up front, with one message about access instead of once per repository.
 func Reachable(ctx context.Context, r Runner, remote string) error {

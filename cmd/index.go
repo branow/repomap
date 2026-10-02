@@ -370,6 +370,7 @@ func report(f *cmdutil.Factory, workspace, out string, summary index.Summary) er
 		output.Field{Name: "described", Value: summary.Described},
 		output.Field{Name: "unchanged", Value: summary.Unchanged},
 		output.Field{Name: "active", Value: summary.Active},
+		output.Field{Name: "empty", Value: listOrNone(summary.Empty)},
 		output.Field{Name: "broken", Value: broken(summary)},
 		output.Field{Name: "missing", Value: len(summary.Missing)},
 		output.Field{Name: "input tokens", Value: summary.Usage.InputTokens},
@@ -407,8 +408,9 @@ func reasons(counted map[string]int) string {
 
 // broken names the repositories a run could not read, rather than counting
 // them: a count tells nobody which one to go and look at.
-func broken(summary index.Summary) string {
-	names := summary.Names()
+func broken(summary index.Summary) string { return listOrNone(summary.Names()) }
+
+func listOrNone(names []string) string {
 	if len(names) == 0 {
 		return "none"
 	}

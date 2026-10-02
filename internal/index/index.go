@@ -4,6 +4,7 @@ package index
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -12,9 +13,11 @@ import (
 
 	"github.com/branow/gollm"
 	"github.com/branow/repomap/internal/catalog"
+	"github.com/branow/repomap/internal/clone"
 	"github.com/branow/repomap/internal/describe"
 	"github.com/branow/repomap/internal/plan"
 	"github.com/branow/repomap/internal/render"
+	"github.com/branow/repomap/internal/scan"
 )
 
 // Options is one build.
@@ -69,7 +72,10 @@ type Summary struct {
 	// Broken counts repositories whose clone or scan failed. They are reported
 	// and skipped, never fatal: one unreadable repository must not discard a
 	// run that already paid for two hundred others.
-	Broken  map[string]error
+	Broken map[string]error
+	// Empty lists repositories that hold no commits yet, kept apart from Broken
+	// because there is nothing to fix and nowhere to go and look.
+	Empty   []string
 	Written int
 	Active  int
 	Usage   gollm.Usage
@@ -138,7 +144,7 @@ func Build(ctx context.Context, src Source, client gollm.Client, opts Options) (
 		info(opts.Logger, "scan: "+position(i, len(scanPlan.Scan))+" "+repo.Name)
 		tree, err := src.Scan(ctx, repo)
 		if err != nil {
-			summary.Broken[repo.Name] = err
+			summary.record(repo.Name, err)
 			warn(opts.Logger, "scan: "+repo.Name+" skipped: "+err.Error())
 			continue
 		}
@@ -312,6 +318,20 @@ func planLine(p plan.ScanPlan) string {
 
 func position(i, total int) string {
 	return strconv.Itoa(i+1) + "/" + strconv.Itoa(total)
+}
+
+// record files a scan failure under the heading that tells the reader what to do
+// about it: a repository with no commits needs nothing, an unreadable one needs
+// somebody to look.
+func (s *Summary) record(name string, err error) {
+	var empty *clone.EmptyError
+	var bare *scan.EmptyError
+	if errors.As(err, &empty) || errors.As(err, &bare) {
+		s.Empty = append(s.Empty, name)
+		sort.Strings(s.Empty)
+		return
+	}
+	s.Broken[name] = err
 }
 
 // Names lists a summary's broken repositories in stable order.

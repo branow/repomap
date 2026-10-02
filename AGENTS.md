@@ -43,6 +43,10 @@ checked out beside it.
   written: it belongs to whoever put it there.
 - **Git never prompts.** Every invocation runs with `GIT_TERMINAL_PROMPT=0`; a build
   runs unattended, and a git that asks for a passphrase hangs it forever.
+- **A macOS build is signed, never ad-hoc.** The keychain binds a stored secret to
+  the signing identity, and an ad-hoc signature anchors to the cdhash - so an
+  unsigned rebuild silently loses access to every token it stored. Build with
+  `scripts/sign.sh`, which refuses a requirement that still mentions a cdhash.
 - **No emoji.** Not in code, comments, docs, or commit messages.
 
 ## Code

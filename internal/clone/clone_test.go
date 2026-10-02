@@ -15,6 +15,12 @@ type fake struct {
 	calls  [][]string
 	isRepo bool
 	err    error
+	// answerHeads opts a test into ls-remote succeeding, so the probe that tells
+	// an empty repository from an unreadable one can be driven both ways. Left
+	// off, ls-remote fails like every other command, which is what a test about
+	// an unreachable remote needs.
+	answerHeads bool
+	heads       string
 }
 
 func (f *fake) Run(_ context.Context, dir string, args ...string) (string, error) {
@@ -24,6 +30,11 @@ func (f *fake) Run(_ context.Context, dir string, args ...string) (string, error
 			return "true", nil
 		}
 		return "", errors.New("not a git repository")
+	}
+	// ls-remote answers even when a clone failed: it is how an empty repository
+	// is told apart from an unreadable one.
+	if args[0] == "ls-remote" && f.answerHeads {
+		return f.heads, nil
 	}
 	if f.err != nil {
 		return "", f.err
@@ -162,5 +173,43 @@ func TestDefaultRootIsPerWorkspace(t *testing.T) {
 	}
 	if !strings.Contains(one, "repomap") {
 		t.Errorf("clones land outside this tool's own directory: %s", one)
+	}
+}
+
+// TestAnEmptyRepositoryIsNotABrokenOne pins what a real Bitbucket account
+// showed: a forge names a default branch for a repository with no commits -
+// Bitbucket says "master" - so the clone fails on a branch nobody ever created,
+// and the run reported two perfectly healthy empty repositories as broken.
+func TestAnEmptyRepositoryIsNotABrokenOne(t *testing.T) {
+	// The clone fails on a branch that was never created, and ls-remote answers
+	// with nothing: the repository is empty.
+	runner := &fake{isRepo: false, answerHeads: true, heads: "", err: errors.New(
+		"fatal: Remote branch master not found in upstream origin")}
+	store := &Store{Root: t.TempDir(), Git: runner}
+
+	_, err := store.Ensure(context.Background(), catalog.Repo{
+		Name: "fresh", Remote: "git@example.internal:acme/fresh.git", Branch: "master"})
+
+	var empty *EmptyError
+	if !errors.As(err, &empty) {
+		t.Fatalf("error = %v, want an EmptyError", err)
+	}
+	if !strings.Contains(err.Error(), "no commits") {
+		t.Errorf("message = %q, want it to say the repository is empty", err)
+	}
+}
+
+// And a repository that genuinely cannot be read stays broken.
+func TestACloneFailureWithBranchesIsStillBroken(t *testing.T) {
+	runner := &fake{isRepo: false, answerHeads: true, heads: "abc123\trefs/heads/main",
+		err: errors.New("Permission denied (publickey).")}
+	store := &Store{Root: t.TempDir(), Git: runner}
+
+	_, err := store.Ensure(context.Background(), catalog.Repo{
+		Name: "api", Remote: "git@example.internal:acme/api.git"})
+
+	var failed *CloneError
+	if !errors.As(err, &failed) {
+		t.Fatalf("error = %v, want a CloneError", err)
 	}
 }

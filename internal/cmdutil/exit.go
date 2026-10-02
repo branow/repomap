@@ -85,6 +85,7 @@ var rules = []struct {
 	{ExitNotFound, as[*credentials.NotFoundError]},
 	{ExitNotFound, as[*forge.NotFoundError]},
 	{ExitNotFound, as[*scan.EmptyError]},
+	{ExitNotFound, as[*clone.EmptyError]},
 
 	{ExitUnavailable, as[*UnavailableError]},
 	{ExitUnavailable, as[*credentials.KeychainError]},

@@ -217,6 +217,53 @@ Settings resolve as **flag > environment > config file > built-in default**.
 Configuration lives in `~/.config/repomap/config.yml` (`%AppData%\repomap` on
 Windows) and never contains a secret.
 
+## Signing, on macOS
+
+The keychain binds each stored secret to the **code identity of the binary that
+stored it**. Go ad-hoc signs by default, and an ad-hoc signature carries no
+certificate, so that identity is the binary's cdhash:
+
+```
+$ codesign -d -r- repomap
+designated => cdhash H"a1c30a963e2957dd94ada228f96e558fffd16a20"
+```
+
+Two builds of identical source have different cdhashes, so an ad-hoc build loses
+access to every token it stored the moment it is rebuilt - or upgraded.
+
+Signing with a certificate replaces that with an identity:
+
+```
+designated => identifier "com.branow.repomap" and anchor apple generic
+              and certificate leaf[subject.OU] = "TEAMID"
+```
+
+No cdhash, so any later build signed by the same certificate is the same program
+as far as the keychain is concerned. Releases are signed by `scripts/sign.sh`,
+which goreleaser runs after each macOS build and which fails loudly if the
+requirement still mentions a cdhash.
+
+Building locally needs an identity of your own, created once:
+
+1. Keychain Access > Certificate Assistant > **Create a Certificate**
+2. Name `repomap-dev`, identity type **Self Signed Root**, certificate type
+   **Code Signing**
+3. `export REPOMAP_SIGN_IDENTITY=repomap-dev`
+
+Then sign after building, and the keychain stops asking:
+
+```sh
+go build -o ~/.local/bin/repomap . && scripts/sign.sh ~/.local/bin/repomap
+```
+
+A self-signed certificate is enough for this: the requirement pins the
+certificate, not the binary. It is not enough to distribute with - that needs a
+Developer ID Application certificate, which also gets releases past Gatekeeper
+without stripping quarantine by hand.
+
+If you would rather not sign at all, `REPOMAP_SECRET_FORGE_<NAME>` bypasses the
+keychain entirely, which is also how a CI runner works.
+
 ## Installing from source
 
 ```sh

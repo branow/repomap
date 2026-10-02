@@ -43,6 +43,19 @@ func (e *UpdateError) Error() string {
 
 func (e *UpdateError) Unwrap() error { return e.Err }
 
+// EmptyError reports a repository the forge lists and that holds no commits yet.
+// It is a normal state, not a failure: a repository created last week and not
+// pushed to is exactly this, and reporting it as broken sends somebody to
+// investigate a non-problem.
+type EmptyError struct {
+	Repo   string
+	Remote string
+}
+
+func (e *EmptyError) Error() string {
+	return e.Repo + " has no commits yet"
+}
+
 // NoRemoteError reports a repository with neither a directory on disk nor a
 // remote to clone from, which is a forge reporting something this tool cannot
 // read.

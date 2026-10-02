@@ -29,6 +29,14 @@ builds:
       - CGO_ENABLED=1
     goos: [darwin]
     goarch: [amd64, arm64]
+    # Signed, not ad-hoc. The keychain binds each stored secret to the code
+    # identity of the binary that stored it, and an ad-hoc signature has no
+    # certificate to anchor to - so the identity is the cdhash, which changes
+    # with every build. Users would re-authorize every token on every upgrade.
+    hooks:
+      post:
+        - cmd: ./scripts/sign.sh "{{ .Path }}"
+          output: true
     ldflags:
       - -s -w
       - -X main.version={{.Version}}
@@ -58,8 +66,10 @@ homebrew_casks:
     directory: Casks
     homepage: https://github.com/branow/repomap
     description: Index a set of repositories into a compact map an agent can read in one pass
-    # The binaries carry no Apple Developer ID, so strip the quarantine flag
-    # Homebrew sets on cask downloads; Gatekeeper otherwise refuses to run them.
+    # Quarantine is stripped only while the release is signed but not yet
+    # notarized. Once notarization is in place this block goes: a notarized
+    # binary passes Gatekeeper on its own, and stripping quarantine by hand is
+    # exactly the habit a user should not be taught.
     custom_block: |
       postflight_steps do
         if_path_exists "/usr/bin/xattr" do

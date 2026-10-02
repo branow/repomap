@@ -65,6 +65,13 @@ func (s *Store) Ensure(ctx context.Context, repo catalog.Repo) (string, error) {
 			return "", &UpdateError{Repo: repo.Name, Dir: dir, Err: err}
 		}
 		if err := git.Clone(ctx, s.Git, repo.Remote, dir, repo.Branch); err != nil {
+			// A forge names a default branch for a repository with no commits -
+			// Bitbucket says "master" - so the clone fails on a branch that was
+			// never created. Ask the remote what it actually has before calling
+			// this broken.
+			if heads, probe := git.Heads(ctx, s.Git, repo.Remote); probe == nil && len(heads) == 0 {
+				return "", &EmptyError{Repo: repo.Name, Remote: repo.Remote}
+			}
 			return "", &CloneError{Repo: repo.Name, Remote: repo.Remote, Err: err}
 		}
 	}
