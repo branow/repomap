@@ -82,10 +82,38 @@ checked out beside it.
   fingerprints it did not touch, a failed describe leaving a row that can never be
   repaired. If one of those fails, the fix is almost certainly in the code, not the test.
 
+## Documentation
+
+A behaviour change lands with the docs that describe it, in the **same commit**. Not
+afterwards and not in a sweep later: this repository has already carried a flag, three
+summary columns, a skill and two settings that existed only in the source, and every one
+of them was found by diffing the docs against the code rather than by reading them.
+
+Which doc owns what, so there is nothing to decide:
+
+| You changed | Update |
+|---|---|
+| a flag, a command, a summary column, a column in the tree | `docs/CLI.md` - **including its example output**, which is wrong the moment a column moves |
+| a decision, or the reasoning behind one - above all a repaired bug | `docs/DESIGN.md` |
+| what the tool is for, or how many skills it has | `README.md` |
+| a skill, a hook, a setting | `plugins/repomap/README.md` and that skill's `SKILL.md` |
+
+Two rules of thumb. Reasoning belongs in `docs/DESIGN.md` and procedure in
+`docs/CLI.md`; when a section needs both, the procedure stays and the reasoning becomes
+a sentence and a link, because the same argument in two files goes stale in one of them.
+And a doc that disagrees with the code is worse than no doc at all, because somebody
+believes it.
+
+`gofmt` has no opinion about prose, so what enforcement exists is in tests:
+`cmd/flags_test.go` fails when a flag is undocumented, and the plugin's
+`consistency.test.js` fails when a skill, hook or slash command is named and missing.
+Extend those rather than trusting a reader to notice.
+
 ## Commits
 
 The repo builds and passes tests at **every** commit. One commit is one meaningful step,
-landed with the tests that prove it. Never "commit now, test later".
+landed with the tests and the docs that prove and describe it. Never "commit now,
+document later".
 
 Conventional Commits: `feat:`, `fix:`, `test:`, `refactor:`, `docs:`, `chore:`. Lowercase
 first word, no body, no attribution or co-author line.

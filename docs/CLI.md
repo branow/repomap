@@ -3,6 +3,23 @@
 Every command takes `-o json`, every prompt has a flag, and `--no-input` turns a
 missing value into an error instead of a hang.
 
+## Flags every command takes
+
+```
+  --profile string          profile to use, overriding the current one
+  -o, --output string       output format: table or json
+  --no-input                never prompt; a missing value is an error
+  --quiet                   suppress status messages
+  --force                   proceed where a command would otherwise refuse
+  --allow-plaintext         allow a 0600 file when the keychain is unavailable
+```
+
+`--force` means something specific per command: on `index` it rebuilds
+everything, ignoring both staleness tiers, and on `workspace remove` it drops an
+entry a profile still binds. `--allow-plaintext` is the only way a secret
+reaches disk outside the keychain, and it is per invocation - the standing
+setting is `secrets.fallback`.
+
 ## What a build writes
 
 ```
@@ -106,7 +123,6 @@ repomap index [workspace] [flags]
   --backend string      model backend to describe with
   --active-years int    how recent a commit keeps a repository in the active view
   --dry-run             report the plan; clone nothing and make no model call
-  --quiet               silence progress
 ```
 
 `--match` and `--limit` cover only what they selected and **merge** into whatever
