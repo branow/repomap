@@ -153,6 +153,7 @@ scan          12
 untouched     134
 skipped       2
 dropped       0
+remaining     0
 reasons       moved 9, new 3
 describe      at most 12, decided by content fingerprint after the scan
 ```
@@ -171,6 +172,47 @@ These are a cache the tool owns: an update is `fetch` then **`reset --hard`**, a
 a directory too broken to fetch is deleted and cloned again. Never work in one.
 A working tree the `local` forge reported is the opposite - never written to,
 because it belongs to whoever put it there.
+
+### What a real run reports
+
+```
+$ repomap index --limit 20
+workspace      acme
+out            .repomap/acme
+repositories   148
+scanned        20
+untouched      0
+skipped        2
+dropped        0
+remaining      126
+reasons        new 20
+described      18
+unchanged      0
+active         96
+empty          new-service, spike-2025
+broken         legacy-importer
+missing        0
+input tokens   412
+output tokens  38104
+cost           0.94
+```
+
+`remaining` is what `--limit` left for the next run; run it again to continue.
+
+The last three are the ones to read carefully, because they mean different
+things:
+
+- **`empty`** holds no commits yet. There is nothing to index and nothing to
+  fix - a repository created last week and not pushed to looks exactly like
+  this. Note that a forge still names a default branch for one, so a clone
+  attempt fails on a branch nobody created; repomap asks the remote what it
+  actually has before deciding.
+- **`broken`** could not be cloned or read. The tree is correct without it, and
+  it is named rather than counted so somebody can go and look. Usually access.
+- **`missing`** was scanned and came back from the model without a sentence.
+  This one **fails the run** (exit 6): a tree whose description column is empty
+  is not a success. A blank row is re-described next build rather than treated as
+  untouched, so the fix is to run again.
 
 ## Checking a workspace
 
@@ -204,7 +246,7 @@ Exit codes are meaningful:
 | 0 | Success |
 | 1 | Generic failure |
 | 2 | Cancelled at a prompt |
-| 3 | Validation error — bad flags, unknown name, unsupported configuration |
+| 3 | Validation error — bad flags, unknown name, unsupported configuration, an account that listed nothing |
 | 4 | Authentication or authorization failure |
 | 5 | Not found |
 | 6 | Unavailable — forge unreachable, git remote unreachable, rate limited |
@@ -219,29 +261,15 @@ Windows) and never contains a secret.
 
 ## Signing, on macOS
 
-The keychain binds each stored secret to the **code identity of the binary that
-stored it**. Go ad-hoc signs by default, and an ad-hoc signature carries no
-certificate, so that identity is the binary's cdhash:
+The keychain binds each stored secret to the code identity of the binary that
+stored it, and Go ad-hoc signs by default - an identity that is the binary's
+content hash, so it changes with every build. Unsigned, repomap loses access to
+every token it stored the moment it is rebuilt or upgraded. Signing with a
+certificate replaces that hash with the identifier plus the signing authority,
+which survives both. [docs/DESIGN.md](DESIGN.md) has the reasoning.
 
-```
-$ codesign -d -r- repomap
-designated => cdhash H"a1c30a963e2957dd94ada228f96e558fffd16a20"
-```
-
-Two builds of identical source have different cdhashes, so an ad-hoc build loses
-access to every token it stored the moment it is rebuilt - or upgraded.
-
-Signing with a certificate replaces that with an identity:
-
-```
-designated => identifier "com.branow.repomap" and anchor apple generic
-              and certificate leaf[subject.OU] = "TEAMID"
-```
-
-No cdhash, so any later build signed by the same certificate is the same program
-as far as the keychain is concerned. Releases are signed by `scripts/sign.sh`,
-which goreleaser runs after each macOS build and which fails loudly if the
-requirement still mentions a cdhash.
+Releases are signed by `scripts/sign.sh`, which goreleaser runs after each macOS
+build and which fails if the requirement still mentions a cdhash.
 
 Building locally needs an identity of your own, created once:
 
@@ -256,13 +284,13 @@ Then sign after building, and the keychain stops asking:
 go build -o ~/.local/bin/repomap . && scripts/sign.sh ~/.local/bin/repomap
 ```
 
-A self-signed certificate is enough for this: the requirement pins the
-certificate, not the binary. It is not enough to distribute with - that needs a
-Developer ID Application certificate, which also gets releases past Gatekeeper
-without stripping quarantine by hand.
+A self-signed certificate is enough here, because the requirement pins the
+certificate rather than the binary. Distributing needs a Developer ID
+Application certificate, which also gets releases past Gatekeeper without
+stripping quarantine by hand.
 
-If you would rather not sign at all, `REPOMAP_SECRET_FORGE_<NAME>` bypasses the
-keychain entirely, which is also how a CI runner works.
+`REPOMAP_SECRET_FORGE_<NAME>` bypasses the keychain entirely, which is also how
+a CI runner works.
 
 ## Installing from source
 

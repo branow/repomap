@@ -105,7 +105,7 @@ the [CLI reference](docs/CLI.md).
 
 | | |
 |---|---|
-| [plugins/repomap](plugins/repomap/README.md) | The Claude Code plugin: the three skills, how an index is found |
+| [plugins/repomap](plugins/repomap/README.md) | The Claude Code plugin: its four skills, how an index is found, how the clones are kept |
 | [docs/CLI.md](docs/CLI.md) | Installing, every command and flag, scripting, exit codes, CI |
 | [docs/DESIGN.md](docs/DESIGN.md) | What the index looks like, what keeps it cheap, adding a forge |
 | [AGENTS.md](AGENTS.md) | The contract for an agent changing this repository |

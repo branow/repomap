@@ -57,12 +57,21 @@ A failure there is silent by construction - nobody is watching a background hook
 so a `UserPromptSubmit` hook reports what went wrong at the next prompt. Problems
 only, by default; `REPOMAP_NOTIFY_LEVEL=info` turns progress on for a session.
 
-## Staleness
+## Settings
 
-Off until asked for. `/repomap-config remind 168` reports at session start when
-the stalest workspace in a tree is older than that; `/repomap-config remind off`
-stops. The age comes from the build stamp the CLI writes into the roster, so a
-rebuild silences it immediately.
+Two, both per machine and both off or quiet by default, because nobody should be
+nudged about a tool they only read from.
+
+- `/repomap-config remind 168` reports at session start when the stalest
+  workspace in a tree is older than that; `remind off` stops. The age comes from
+  the build stamp the CLI writes into the roster, so a rebuild silences it
+  immediately.
+- `/repomap-config notify info` lowers what the activity hook reports. The
+  default is `warn`, so a healthy background sync says nothing;
+  `REPOMAP_NOTIFY_LEVEL` overrides it for one session.
+
+`/repomap-config clones` says where the repositories are kept and how many are
+there.
 
 ## Tests
 

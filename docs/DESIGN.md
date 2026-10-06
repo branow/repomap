@@ -326,6 +326,52 @@ whether it is remote at all. The local forge is not a special case in the
 pipeline; it is a row in a table that says it reads a directory and takes no
 credential.
 
+## The format is read by column name
+
+Every TSV this tool writes is read back by looking the column up in the header,
+never by position. That is not fastidiousness; it is a repaired bug.
+
+Adding the `remote` column shifted every column after it, and the reader was
+indexing by position. A build reading a tree written by the previous release
+therefore found the description one column over, which is to say it found none -
+so the entire account looked undescribed and every repository was bought again
+on the first run after an upgrade. On a few hundred repositories that is a few
+hundred model calls nobody asked for.
+
+A header lookup makes the mistake impossible rather than merely avoided: a
+column an older tree does not have reads empty, which is what absent should look
+like, and never the neighbouring column's value. The header travels with the
+rows it was written against, and one build rewrites the rows it carries forward
+into the current order, so a tree is brought current by using it.
+
+The same rule protects the writer. A row is replaced only by a run that actually
+scanned that repository. A repository the activity signal proved untouched
+arrives with no tree, and rendering its file count, size and last commit from
+that empty tree wrote zeroes and a blank date over three correct columns on
+every merge. The blank date was the worst of the three, because an undated row
+is deliberately kept in the active view - so the view quietly filled with
+repositories nobody had touched in years, and the shortcut the view exists to be
+stopped being one.
+
+## Signing, and the keychain
+
+On macOS a stored secret is bound to the code identity of the binary that stored
+it, and Go ad-hoc signs by default. An ad-hoc signature carries no certificate,
+so that identity is the binary's content hash - different for every build, even
+of identical source. Unsigned, the tool therefore loses access to every token it
+stored the moment it is rebuilt, or upgraded.
+
+The fix is a certificate, not a weaker binding. Signed, the requirement the
+keychain stores is the identifier plus the signing authority, with no content
+hash in it, so any later build signed by the same certificate is the same
+program. `scripts/sign.sh` does it and then checks its own work: a requirement
+that still mentions a cdhash fails the build, because the alternative is handing
+somebody a binary that will lock them out later for reasons they cannot see.
+
+What was explicitly rejected is dropping the binding to make the problem go
+away. It is the one real protection the macOS path has over the other platforms,
+and the cost of keeping it is one certificate.
+
 ## Safety and privacy
 
 - **Tokens never enter the config file.** They live in the OS keychain, or come
