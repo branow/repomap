@@ -285,7 +285,22 @@ certificate replaces that hash with the identifier plus the signing authority,
 which survives both. [docs/DESIGN.md](DESIGN.md) has the reasoning.
 
 Releases are signed by `scripts/sign.sh`, which goreleaser runs after each macOS
-build and which fails if the requirement still mentions a cdhash.
+build and which fails if the requirement still mentions a cdhash. The release
+workflow imports the certificate into a throwaway keychain from three repository
+secrets:
+
+| Secret | Holds |
+|---|---|
+| `MACOS_SIGN_P12` | the certificate and its key, as a base64-encoded `.p12` |
+| `MACOS_SIGN_P12_PASSWORD` | the `.p12` password |
+| `REPOMAP_SIGN_IDENTITY` | the certificate's common name |
+
+`TAP_GITHUB_TOKEN`, a token that can push to the Homebrew tap and the Scoop
+bucket, is the fourth secret a release needs.
+
+The release certificate must never change: every token a user stored is bound to
+it, so a new certificate locks every upgrading user out of their tokens once.
+Keep the `.p12` backed up outside the repository.
 
 Building locally needs an identity of your own, created once:
 
@@ -301,9 +316,10 @@ go build -o ~/.local/bin/repomap . && scripts/sign.sh ~/.local/bin/repomap
 ```
 
 A self-signed certificate is enough here, because the requirement pins the
-certificate rather than the binary. Distributing needs a Developer ID
-Application certificate, which also gets releases past Gatekeeper without
-stripping quarantine by hand.
+certificate rather than the binary. Releases are self-signed for the same reason;
+the Homebrew cask strips quarantine so Gatekeeper does not block them. A Developer
+ID Application certificate would pass Gatekeeper on its own, but switching to one
+is a certificate change, with the cost above.
 
 `REPOMAP_SECRET_FORGE_<NAME>` bypasses the keychain entirely, which is also how
 a CI runner works.

@@ -47,8 +47,8 @@ error: REPOMAP_SIGN_IDENTITY is not set, so this build would be ad-hoc signed an
 
     export REPOMAP_SIGN_IDENTITY=repomap-dev
 
-  For a release, use the Developer ID Application certificate, which also gets
-  the binaries past Gatekeeper without stripping quarantine by hand.
+  A release signs with the release certificate, which the release workflow
+  imports from repository secrets; see docs/CLI.md.
 EOF
   exit 1
 fi
