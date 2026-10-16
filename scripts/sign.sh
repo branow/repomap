@@ -60,11 +60,17 @@ codesign --force --options runtime \
 
 # The requirement is what the keychain actually stores, so print it: a cdhash in
 # here means the signature did not take and the next rebuild will lock you out.
-requirement=$(codesign -d -r- "$BINARY" 2>/dev/null | sed -n 's/^# designated => //p')
+# Some codesign versions prefix the line with "# " and some do not, and a pattern
+# that misses it reads an empty requirement and passes everything.
+requirement=$(codesign -d -r- "$BINARY" 2>/dev/null | sed -n 's/^\(# \)\{0,1\}designated => //p')
 echo "signed $BINARY"
 echo "  requirement: $requirement"
 
 case "$requirement" in
+  "")
+    echo "error: could not read the designated requirement back from $BINARY" >&2
+    exit 1
+    ;;
   *cdhash*)
     echo "warning: the requirement is still cdhash-based, so a rebuild will lose" >&2
     echo "         keychain access. Check that the identity is a real certificate." >&2

@@ -367,6 +367,9 @@ hash in it, so any later build signed by the same certificate is the same
 program. `scripts/sign.sh` does it and then checks its own work: a requirement
 that still mentions a cdhash fails the build, because the alternative is handing
 somebody a binary that will lock them out later for reasons they cannot see.
+The check once matched only the `# designated =>` form, read an empty requirement
+from a codesign that omits the `# `, and passed everything; it now accepts both
+forms and fails on an empty read, so a check that cannot see is not a pass.
 
 What was explicitly rejected is dropping the binding to make the problem go
 away. It is the one real protection the macOS path has over the other platforms,
