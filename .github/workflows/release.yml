@@ -62,7 +62,10 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean
+          # One target at a time. A cold build of the model SDKs peaks near 2 GB per
+          # compiler process, and the default of one build per core runs the macOS
+          # runner out of memory: the release swaps for as long as it is allowed to.
+          args: release --clean --parallelism 1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Absent, goreleaser fails the whole release at the publish step,
