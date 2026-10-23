@@ -68,6 +68,22 @@ func (r Repo) Skipped() (string, bool) {
 	return "", false
 }
 
+// Placeholder is what a skipped repository shows in place of a description: the
+// reason in parentheses, so a reader sees why the row has no sentence.
+func Placeholder(reason string) string { return "(" + reason + ")" }
+
+// IsPlaceholder reports whether a description is a skip placeholder rather than
+// a sentence. Only the reasons in Skips count, so a real sentence that happens
+// to be parenthesised is not mistaken for one.
+func IsPlaceholder(description string) bool {
+	for _, skip := range Skips {
+		if description == Placeholder(skip.Reason) {
+			return true
+		}
+	}
+	return false
+}
+
 // Describable reports whether this repository earns a generated sentence.
 func (r Repo) Describable() bool {
 	_, skipped := r.Skipped()

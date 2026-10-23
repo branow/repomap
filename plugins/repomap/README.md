@@ -47,7 +47,9 @@ everything it did.
 The index says which repository and which file; a clone is what lets you open it.
 A SessionStart hook fetches, in the background, anything older than 12 hours,
 reading each repository's clone url out of the index itself - so it needs no forge
-credential and no `repomap` binary. `/repomap-sync` fetches one now.
+credential and no `repomap` binary. `/repomap-sync` fetches one now. A repository
+the build skipped - `(archived)` in its description - is never cloned, and a clone
+made before it was skipped is removed.
 
 They live under the plugin's data directory, and the build is told to use the same
 place, so a machine keeps one shallow copy of each repository rather than two.

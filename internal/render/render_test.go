@@ -213,6 +213,38 @@ func TestActiveKeepsOnlyRecentRepositories(t *testing.T) {
 	}
 }
 
+// TestActiveLeavesOutSkippedRepositories: a skipped row is never scanned, so it
+// is usually undated, and the undated rule kept every archived repository in
+// the view meant to hide the dead ones.
+func TestActiveLeavesOutSkippedRepositories(t *testing.T) {
+	now := time.Date(2026, 9, 28, 0, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		name, date string
+	}{
+		{"undated", ""},
+		{"recently committed", "2026-06-01"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			frozen := entry("frozen", "", tc.date)
+			frozen.Skip = catalog.Skips[0].Reason
+			if _, err := Catalog(dir, []catalog.Entry{
+				entry("current", "recent", "2026-06-01"), frozen,
+			}, nil); err != nil {
+				t.Fatal(err)
+			}
+			kept, _, err := Active(dir, 1, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if body := read(t, filepath.Join(dir, ActiveFile)); strings.Contains(body, "frozen") ||
+				kept != 1 {
+				t.Errorf("kept = %d, want only the live repository:\n%s", kept, body)
+			}
+		})
+	}
+}
+
 // TestTheRosterMergesToo: a tree holds several workspaces built at different
 // times by different people, so a build that rewrote the file would erase the
 // stamps of the ones it did not touch.

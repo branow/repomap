@@ -23,8 +23,8 @@ clone repositories instead.
 ## Step 2: Find the repository
 
 `<WS>/repos-active.tsv`. One row per repository: name first, description last.
-It omits repositories with no commit in a year; `<WS>/repos.tsv` is the full
-list, for something old or archived.
+It omits archived repositories and those with no commit in a year;
+`<WS>/repos.tsv` is the full list, for something old or archived.
 
 Read the whole file rather than grepping it - it is a list of one-sentence
 descriptions, which is how you find a repository whose name you do not know.

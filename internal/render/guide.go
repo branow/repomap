@@ -14,7 +14,7 @@ func layout() string {
 		{"    " + RosterFile, "one row per workspace: forge, counts, when it was built"},
 		{"    <workspace>/", ""},
 		{"      " + CatalogFile, "one row per repository, with a sentence saying what it is"},
-		{"      " + ActiveFile, "the same rows, minus repositories with no commit in a year"},
+		{"      " + ActiveFile, "the same rows, minus skipped ones and those with no commit in a year"},
 		{"      " + FilesDir + "/<repo>.tsv",
 			"one per repository: every tracked file, some with a phrase"},
 	}

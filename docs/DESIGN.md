@@ -72,7 +72,9 @@ The cutoff is a year rather than a quarter because a service that is finished an
 correct gets a dependency bump twice a year and is still exactly the repository
 somebody is looking for. A row whose commit date is missing or unparseable is
 kept: the view hides what is certainly dead, and an undated row is not certainly
-anything.
+anything. A skipped row is the exception, left out whatever its date: it is never
+scanned, so it is usually undated, and the undated rule once kept every archived
+repository in the view meant to hide them.
 
 ### The tree describes itself
 

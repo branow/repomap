@@ -6,6 +6,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/branow/repomap/internal/catalog"
 )
 
 // DefaultActiveYears is the window a repository counts as active in. A year
@@ -37,6 +39,12 @@ func Active(dir string, years int, now time.Time) (kept, total int, err error) {
 
 	ordered := make([][]string, 0, len(names))
 	for _, name := range names {
+		// A skipped row is certainly dead whatever its date says. It is never
+		// scanned, so its commit date is usually missing, and an undated row
+		// would otherwise be kept - an archived repository looking active.
+		if catalog.IsPlaceholder(table.At(table.Rows[name], "description")) {
+			continue
+		}
 		// A row whose commit date is missing or unparseable is kept. The view
 		// exists to hide what is certainly dead, and a row that cannot be dated
 		// is not certainly anything.
@@ -49,7 +57,7 @@ func Active(dir string, years int, now time.Time) (kept, total int, err error) {
 	preamble := strings.Join([]string{
 		"# repositories with a commit since " + cutoff,
 		"# " + strconv.Itoa(len(names)-len(ordered)) +
-			" older repositories omitted - " + CatalogFile + " has the full list",
+			" older or skipped repositories omitted - " + CatalogFile + " has the full list",
 		"# generated " + now.UTC().Format(time.RFC3339) + "; do not edit, a build rewrites it",
 	}, "\n") + "\n"
 

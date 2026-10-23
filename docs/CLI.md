@@ -28,7 +28,7 @@ setting is `secrets.fallback`.
   README.md         the layout, for whoever reads the tree
   <workspace>/
     repos.tsv         name, files, size, commit, remote, activity, fingerprint, description
-    repos-active.tsv  the same rows, minus repositories with no commit in a year
+    repos-active.tsv  the same rows, minus skipped ones and those with no commit in a year
     files/<repo>.tsv  one per repository: every tracked file, some with a phrase
 ```
 

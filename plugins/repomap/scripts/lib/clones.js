@@ -55,6 +55,10 @@ function syncable(forge) {
 // repos reads the catalog rows of one workspace: the name and the clone url, by
 // header name rather than by column position so a build that adds a column does
 // not silently shift what this reads.
+//
+// A row whose description is a placeholder in parentheses - `(archived)` - was
+// skipped by the build, which never cloned it, so neither does this. Leaving it
+// out here also lets prune remove a clone made before the repository retired.
 function repos(treePath, workspace) {
   const file = join(treePath, workspace, "repos.tsv");
   if (!existsSync(file)) return [];
@@ -68,9 +72,14 @@ function repos(treePath, workspace) {
     if (!line.trim() || line.startsWith("#")) continue;
     const cells = line.split("\t");
     if (!cells[0] || cells[0] === "repo") continue;
+    if (skipped(at(cells, "description"))) continue;
     rows.push({ name: cells[0], remote: at(cells, "remote"), commit: at(cells, "commit") });
   }
   return rows;
+}
+
+function skipped(description) {
+  return description.startsWith("(") && description.endsWith(")");
 }
 
 // plan decides what this run will touch. A repository with no clone url is

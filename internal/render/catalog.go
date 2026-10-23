@@ -118,7 +118,7 @@ func row(entry catalog.Entry, prior []string, table Table) []string {
 	if entry.Skip != "" {
 		// A skipped repository says so in the column a reader looks at, rather
 		// than leaving a blank that is indistinguishable from a failed describe.
-		description = "(" + entry.Skip + ")"
+		description = catalog.Placeholder(entry.Skip)
 	}
 
 	files := strconv.Itoa(len(entry.Tree.Files))

@@ -43,7 +43,8 @@ function tree(rows) {
     join(dir, "ws", "repos.tsv"),
     "repo\tfiles\tsize\tcommit\tremote\tactivity\tfingerprint\tdescription\n" +
       rows
-        .map((r) => `${r.name}\t1\t1 KB\t2026-01-01\t${r.remote}\tx\thash\t${r.name} does a thing`)
+        .map((r) => `${r.name}\t1\t1 KB\t2026-01-01\t${r.remote}\tx\thash\t` +
+          (r.description ?? `${r.name} does a thing`))
         .join("\n") +
       "\n",
   );
@@ -178,6 +179,23 @@ test("prune removes clones the catalog no longer lists", async () => {
 
   assert.deepEqual(clones.prune(reg, path, "ws"), ["retired"]);
   assert.deepEqual(readdirSync(join(clones.root(reg), "ws")), ["api"]);
+});
+
+// The build never clones a repository it skipped, and a sync that did would
+// spend a clone on every archived and deprecated repository the account holds.
+test("a skipped repository is not cloned, and its old clone is pruned", async () => {
+  const reg = registry();
+  const path = tree([
+    { name: "api", remote: publish("api") },
+    { name: "legacy", remote: publish("legacy"), description: "(deprecated)" },
+  ]);
+  mkdirSync(join(clones.root(reg), "ws", "legacy", ".git"), { recursive: true });
+
+  const result = await clones.sync(reg, path, "ws");
+
+  assert.equal(result.synced, 1);
+  assert.deepEqual(clones.prune(reg, path, "ws"), ["legacy"]);
+  assert.deepEqual(clones.held(reg, path, "ws"), { present: 1, total: 1 });
 });
 
 // A prune that ran against an unreadable catalog would delete every clone.
