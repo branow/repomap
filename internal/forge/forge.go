@@ -48,6 +48,9 @@ type Config struct {
 	// Exclude drops repositories whose name contains any of these substrings, or,
 	// for an entry starting with "=", whose name is exactly the rest of it.
 	Exclude []string
+	// Deprecated names repositories, exactly, that stay listed but are marked
+	// dead: never cloned, never described.
+	Deprecated []string
 	Credential
 	// HTTP is the client every request goes through, so a test never opens a
 	// socket. Nil means http.DefaultClient.
@@ -63,14 +66,20 @@ func (c Config) Client() *http.Client {
 }
 
 // Filter is the gate every forge's listing leaves through. It drops excluded
-// repositories, strips any credential a clone url carries, and sorts the rest by
-// name so the manifest does not depend on the order a paginated API answered in.
+// repositories, marks deprecated ones, strips any credential a clone url
+// carries, and sorts the rest by name so the manifest does not depend on the
+// order a paginated API answered in.
 func (c Config) Filter(repos []catalog.Repo) []catalog.Repo {
+	deprecated := make(map[string]bool, len(c.Deprecated))
+	for _, name := range c.Deprecated {
+		deprecated[name] = true
+	}
 	kept := make([]catalog.Repo, 0, len(repos))
 	for _, repo := range repos {
 		if c.excluded(repo.Name) {
 			continue
 		}
+		repo.Deprecated = deprecated[repo.Name]
 		repo.Remote = CleanRemote(repo.Remote)
 		kept = append(kept, repo)
 	}

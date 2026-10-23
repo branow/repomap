@@ -55,6 +55,15 @@ row; spending a model call on it is what is not worth doing. Its row says
 `(archived)` in the description column rather than being left blank, because a
 blank is indistinguishable from a describe that failed.
 
+A deprecated repository is the same row for a forge that cannot say "archived":
+Bitbucket Cloud has no archive flag, so the workspace names its dead
+repositories itself and they are skipped as `(deprecated)`. `exclude` could not
+do this job. It drops a repository before the catalog sees it, so the index
+stops saying the repository exists, and "it is dead" is an answer while "never
+heard of it" is not. Its substring match also takes every name sharing a prefix
+with the one meant. The deprecated list is exact names for that reason, and
+`exclude` gained an exact form, `=name`, for the same reason.
+
 ### The active view
 
 `repos-active.tsv` is the same catalog with repositories nobody has committed to

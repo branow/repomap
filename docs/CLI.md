@@ -80,7 +80,7 @@ API key.
 ```sh
 repomap workspace add acme --forge github --slug acme --auth token
 repomap workspace add tools --forge bitbucket --slug acme-tools \
-  --auth token --username reader --exclude -archive
+  --auth token --username reader --exclude -archive --deprecated legacy-billing
 repomap workspace add local --forge local --dir ~/src --auth none
 repomap workspace list
 repomap workspace show acme
@@ -103,7 +103,20 @@ A Bitbucket app password is presented as basic auth and so needs `--username`; a
 GitHub token stands alone. A self-hosted forge takes `--base-url` pointing at its
 API root. `--exclude` is repeatable and drops any repository whose name contains
 the substring; prefixed with `=`, as in `--exclude =api`, it drops only the
-repository with exactly that name, so `api-gateway` stays.
+repository with exactly that name, so `api-gateway` stays. An excluded repository
+is not in the index at all.
+
+`--deprecated <name>` is for a repository that is dead but should still be found
+as dead. It is repeatable and matches the exact name. The repository stays in
+`repos.tsv` with `(deprecated)` for its description, the way an archived one
+shows `(archived)`, and is never cloned, never described and left out of
+`repos-active.tsv`. On Bitbucket Cloud, which has no archive flag, it is the only
+way to mark a repository archived. The list lives in the workspace entry as
+`deprecated:`, so it can also be edited in the config file.
+
+`workspace add` probes the forge before it stores anything; `--no-verify` stores
+without probing. The token is prompted for, or read from stdin with
+`--token-stdin` when no terminal is attached.
 
 Clones land under the user's cache directory; `--clones <dir>` points a workspace
 at a tree something else maintains instead.

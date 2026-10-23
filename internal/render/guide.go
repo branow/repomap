@@ -67,8 +67,8 @@ not know - grepping it only finds the ones you could already name. Fall back to
 ` + "`activity`" + ` and ` + "`fingerprint`" + ` are the build's own bookkeeping.
 Ignore them.
 
-A description in parentheses - ` + "`(archived)`" + ` - is not a description: it
-says the repository was listed but deliberately not described.
+A description in parentheses - ` + "`(archived)`" + `, ` + "`(deprecated)`" + ` - is not a
+description: it says the repository exists, is dead, and was deliberately not described.
 
 ## Finding the right file
 

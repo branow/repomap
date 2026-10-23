@@ -44,6 +44,7 @@ type workspaceOptions struct {
 	auth     string
 	username string
 	exclude  []string
+	retired  []string
 	stdin    bool
 	noVerify bool
 }
@@ -69,6 +70,8 @@ func newWorkspaceAdd(f *cmdutil.Factory) *cobra.Command {
 	flags.StringVar(&opts.username, "username", "", "login name the token belongs to")
 	flags.StringArrayVar(&opts.exclude, "exclude", nil,
 		"skip repositories whose name contains this, or is exactly it after =; repeatable")
+	flags.StringArrayVar(&opts.retired, "deprecated", nil,
+		"list this repository, by exact name, as dead: never cloned or described; repeatable")
 	flags.BoolVar(&opts.stdin, "token-stdin", false, "read the access token from stdin")
 	flags.BoolVar(&opts.noVerify, "no-verify", false, "store without probing the forge")
 	return cmd
@@ -109,14 +112,15 @@ func addWorkspace(c *cobra.Command, f *cmdutil.Factory, name string,
 	}
 
 	entry := config.Workspace{
-		Forge:    forgeName,
-		Slug:     opts.slug,
-		BaseURL:  opts.baseURL,
-		Dir:      opts.dir,
-		Clones:   opts.clones,
-		Auth:     auth,
-		Username: opts.username,
-		Exclude:  opts.exclude,
+		Forge:      forgeName,
+		Slug:       opts.slug,
+		BaseURL:    opts.baseURL,
+		Dir:        opts.dir,
+		Clones:     opts.clones,
+		Auth:       auth,
+		Username:   opts.username,
+		Exclude:    opts.exclude,
+		Deprecated: opts.retired,
 	}
 	key := credentials.ForgeKey(name)
 	secret, from, err := readSecret(f, opts.stdin, key, "access token", "--token-stdin",
@@ -183,6 +187,7 @@ func newWorkspaceShow(f *cmdutil.Factory) *cobra.Command {
 				{Name: "username", Value: entry.Username},
 				{Name: "clones", Value: entry.Clones},
 				{Name: "exclude", Value: entry.Exclude},
+				{Name: "deprecated", Value: entry.Deprecated},
 			})
 		},
 	}

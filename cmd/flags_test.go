@@ -83,6 +83,32 @@ func TestThePersistentFlagsAreDocumented(t *testing.T) {
 	})
 }
 
+// TestEveryWorkspaceFlagIsDocumented: `workspace add` is where a workspace's
+// whole shape is set, and its flags are documented in prose as much as in the
+// example block, so any mention in the section counts.
+func TestEveryWorkspaceFlagIsDocumented(t *testing.T) {
+	body, err := os.ReadFile("../docs/CLI.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	const heading = "## Workspaces and backends"
+	section := string(body)
+	at := strings.Index(section, heading)
+	if at < 0 {
+		t.Fatalf("docs/CLI.md no longer contains %q", heading)
+	}
+	section = section[at+len(heading):]
+	if end := strings.Index(section, "\n## "); end >= 0 {
+		section = section[:end]
+	}
+
+	newWorkspaceAdd(&cmdutil.Factory{}).Flags().VisitAll(func(f *pflag.Flag) {
+		if !strings.Contains(section, "--"+f.Name) {
+			t.Errorf("workspace add has --%s and %q does not mention it", f.Name, heading)
+		}
+	})
+}
+
 // TestTheSummaryColumnsAreDocumented: a run's summary is the only thing most
 // people read, and three of its columns once existed solely in the source.
 func TestTheSummaryColumnsAreDocumented(t *testing.T) {

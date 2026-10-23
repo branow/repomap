@@ -128,7 +128,8 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	c := NewAt(path)
 	if err := c.SetWorkspace("primary", Workspace{Forge: Bitbucket,
 		Slug: "example", BaseURL: "https://git.example.internal", Auth: Token,
-		Username: "reader", Exclude: []string{"-archive"}}); err != nil {
+		Username: "reader", Exclude: []string{"-archive"},
+		Deprecated: []string{"legacy"}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := c.SetBackend("main", Backend{Provider: OpenAI, Model: "model-a",
@@ -158,6 +159,9 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	}
 	if len(entry.Exclude) != 1 || entry.Exclude[0] != "-archive" {
 		t.Errorf("exclude round trip lost fields: %+v", entry.Exclude)
+	}
+	if len(entry.Deprecated) != 1 || entry.Deprecated[0] != "legacy" {
+		t.Errorf("deprecated round trip lost fields: %+v", entry.Deprecated)
 	}
 	if reloaded.CurrentProfile != "work" {
 		t.Errorf("current profile = %q", reloaded.CurrentProfile)

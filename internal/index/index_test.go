@@ -368,30 +368,49 @@ func TestADryRunReadsTheListingAndStops(t *testing.T) {
 	}
 }
 
-// TestAnArchivedRepositoryIsListedAndNeverDescribed.
-func TestAnArchivedRepositoryIsListedAndNeverDescribed(t *testing.T) {
-	out := t.TempDir()
-	src := newSource()
-	src.repos = append(src.repos, catalog.Repo{Name: "old", Archived: true,
-		Activity: "2019-01-01", Remote: "git@example.internal:acme/old.git"})
-	client := &fakeClient{}
+// TestASkippedRepositoryIsListedAndNeverDescribed: archived by the forge or
+// deprecated by the workspace, a dead repository keeps its row and costs no
+// scan, no model call and no place in the active view.
+func TestASkippedRepositoryIsListedAndNeverDescribed(t *testing.T) {
+	for _, tc := range []struct {
+		reason string
+		repo   catalog.Repo
+	}{
+		{"archived", catalog.Repo{Archived: true}},
+		{"deprecated", catalog.Repo{Deprecated: true}},
+	} {
+		t.Run(tc.reason, func(t *testing.T) {
+			out := t.TempDir()
+			src := newSource()
+			repo := tc.repo
+			repo.Name, repo.Activity = "old", "2019-01-01"
+			repo.Remote = "git@example.internal:acme/old.git"
+			src.repos = append(src.repos, repo)
+			client := &fakeClient{}
 
-	summary, err := Build(context.Background(), src, client, options(out))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if summary.Skipped != 1 || client.calls != 2 {
-		t.Errorf("skipped = %d with %d calls, want 1 and 2", summary.Skipped, client.calls)
-	}
-	body, err := os.ReadFile(filepath.Join(out, "acme", render.CatalogFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(body), "old\t") {
-		t.Error("the archived repository was dropped from the catalog rather than kept")
-	}
-	if !strings.Contains(string(body), "(archived)") {
-		t.Error("the row does not say why it has no description")
+			summary, err := Build(context.Background(), src, client, options(out))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if summary.Skipped != 1 || client.calls != 2 {
+				t.Errorf("skipped = %d with %d calls, want 1 and 2", summary.Skipped, client.calls)
+			}
+			for _, scanned := range src.scans {
+				if scanned == "old" {
+					t.Error("the skipped repository was scanned")
+				}
+			}
+			body := readFile(t, filepath.Join(out, "acme", render.CatalogFile))
+			if !strings.Contains(body, "old\t") {
+				t.Error("the repository was dropped from the catalog rather than kept")
+			}
+			if !strings.Contains(body, "("+tc.reason+")") {
+				t.Error("the row does not say why it has no description")
+			}
+			if strings.Contains(readFile(t, filepath.Join(out, "acme", render.ActiveFile)), "old\t") {
+				t.Error("the skipped repository is in the active view")
+			}
+		})
 	}
 }
 
@@ -481,4 +500,13 @@ func TestADroppedRowStillGoesWhenTheListingIsComplete(t *testing.T) {
 	if summary.Dropped != 1 {
 		t.Errorf("dropped = %d, want 1", summary.Dropped)
 	}
+}
+
+func readFile(t *testing.T, path string) string {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(body)
 }

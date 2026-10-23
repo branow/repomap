@@ -100,10 +100,11 @@ func openSource(name string, entry config.Workspace,
 	secret credentials.Secret) (index.Source, error) {
 
 	f, err := forge.New(string(entry.Forge), forge.Config{
-		Slug:    entry.Slug,
-		BaseURL: entry.BaseURL,
-		Dir:     entry.Dir,
-		Exclude: entry.Exclude,
+		Slug:       entry.Slug,
+		BaseURL:    entry.BaseURL,
+		Dir:        entry.Dir,
+		Exclude:    entry.Exclude,
+		Deprecated: entry.Deprecated,
 		Credential: forge.Credential{
 			Username: entry.Username,
 			Token:    secret.Reveal(),

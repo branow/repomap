@@ -23,13 +23,14 @@ clone repositories instead.
 ## Step 2: Find the repository
 
 `<WS>/repos-active.tsv`. One row per repository: name first, description last.
-It omits archived repositories and those with no commit in a year;
+It omits archived and deprecated repositories and those with no commit in a year;
 `<WS>/repos.tsv` is the full list, for something old or archived.
 
 Read the whole file rather than grepping it - it is a list of one-sentence
 descriptions, which is how you find a repository whose name you do not know.
 `activity` and `fingerprint` are build state; ignore them. A description in
-parentheses - `(archived)` - means the repository was listed and not described.
+parentheses - `(archived)`, `(deprecated)` - means the repository exists, is dead,
+and was deliberately not described.
 
 ## Step 3: Read the repository
 

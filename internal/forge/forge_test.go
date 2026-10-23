@@ -101,6 +101,21 @@ func TestAnExactExcludeTakesOnlyThatName(t *testing.T) {
 	}
 }
 
+// TestDeprecatedMarksOnlyTheExactName: the list is names, not patterns, so a
+// deprecated name that is a prefix of a live one leaves the live one alone. A
+// deprecated repository is marked, not dropped - the catalog still lists it.
+func TestDeprecatedMarksOnlyTheExactName(t *testing.T) {
+	got := Config{Deprecated: []string{"api"}}.Filter([]catalog.Repo{
+		{Name: "api"}, {Name: "api-gateway"},
+	})
+	if len(got) != 2 {
+		t.Fatalf("kept %v, want both repositories listed", names(got))
+	}
+	if !got[0].Deprecated || got[1].Deprecated {
+		t.Errorf("deprecated = %v, %v; want only api marked", got[0].Deprecated, got[1].Deprecated)
+	}
+}
+
 // TestAnEmptyExcludePatternMatchesNothing: strings.Contains is true of every
 // string for "", so an empty entry left in a config would silently exclude the
 // whole account.

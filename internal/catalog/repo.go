@@ -35,6 +35,9 @@ type Repo struct {
 	Dir string
 	// Archived marks a repository the forge reports as read-only.
 	Archived bool
+	// Deprecated marks a repository the workspace lists as dead by name, which
+	// is the only archive state a forge without an archive flag can have.
+	Deprecated bool
 	// Activity is the forge's last-activity stamp: the free signal that decides
 	// whether this repository is scanned again.
 	Activity Signal
@@ -56,6 +59,7 @@ type Skip struct {
 // spending a model call to describe one is what is not worth doing.
 var Skips = []Skip{
 	{Reason: "archived", When: func(r Repo) bool { return r.Archived }},
+	{Reason: "deprecated", When: func(r Repo) bool { return r.Deprecated }},
 }
 
 // Skipped reports why a repository is not described, and whether it is.

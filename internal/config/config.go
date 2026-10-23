@@ -68,6 +68,10 @@ type Workspace struct {
 	// or exactly matches one written with a leading "=", so an account full of
 	// archived forks can be indexed without them.
 	Exclude []string `yaml:"exclude,omitempty"`
+	// Deprecated names repositories, exactly, that are dead but should still be
+	// listed as such: kept in the catalog, never cloned or described. It is how
+	// a forge with no archive flag, like Bitbucket Cloud, says "archived".
+	Deprecated []string `yaml:"deprecated,omitempty"`
 }
 
 // Backend is one named llm backend. Its api key, when the provider needs one,
