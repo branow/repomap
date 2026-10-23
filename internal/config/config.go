@@ -65,7 +65,8 @@ type Workspace struct {
 	// at a checkout tree something else already maintains.
 	Clones string `yaml:"clones,omitempty"`
 	// Exclude drops repositories whose name contains any of these substrings,
-	// so an account full of archived forks can be indexed without them.
+	// or exactly matches one written with a leading "=", so an account full of
+	// archived forks can be indexed without them.
 	Exclude []string `yaml:"exclude,omitempty"`
 }
 

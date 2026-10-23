@@ -81,6 +81,26 @@ func TestFilterExcludesAndSorts(t *testing.T) {
 	}
 }
 
+// TestAnExactExcludeTakesOnlyThatName: a substring cannot name a repository
+// whose name is a prefix of another's without excluding both.
+func TestAnExactExcludeTakesOnlyThatName(t *testing.T) {
+	repos := []catalog.Repo{{Name: "api"}, {Name: "api-gateway"}, {Name: "legacy-api"}}
+	for _, tc := range []struct {
+		exclude []string
+		want    []string
+	}{
+		{[]string{"=api"}, []string{"api-gateway", "legacy-api"}},
+		{[]string{"api"}, nil},
+		{[]string{"=api-gate"}, []string{"api", "api-gateway", "legacy-api"}},
+		{[]string{"="}, []string{"api", "api-gateway", "legacy-api"}},
+	} {
+		got := names(Config{Exclude: tc.exclude}.Filter(repos))
+		if strings.Join(got, ",") != strings.Join(tc.want, ",") {
+			t.Errorf("exclude %q kept %v, want %v", tc.exclude, got, tc.want)
+		}
+	}
+}
+
 // TestAnEmptyExcludePatternMatchesNothing: strings.Contains is true of every
 // string for "", so an empty entry left in a config would silently exclude the
 // whole account.

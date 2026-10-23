@@ -68,7 +68,7 @@ func newWorkspaceAdd(f *cmdutil.Factory) *cobra.Command {
 	flags.StringVar(&opts.auth, "auth", "", "authentication mode")
 	flags.StringVar(&opts.username, "username", "", "login name the token belongs to")
 	flags.StringArrayVar(&opts.exclude, "exclude", nil,
-		"skip repositories whose name contains this, repeatable")
+		"skip repositories whose name contains this, or is exactly it after =; repeatable")
 	flags.BoolVar(&opts.stdin, "token-stdin", false, "read the access token from stdin")
 	flags.BoolVar(&opts.noVerify, "no-verify", false, "store without probing the forge")
 	return cmd

@@ -102,7 +102,8 @@ or `none`.
 A Bitbucket app password is presented as basic auth and so needs `--username`; a
 GitHub token stands alone. A self-hosted forge takes `--base-url` pointing at its
 API root. `--exclude` is repeatable and drops any repository whose name contains
-the substring.
+the substring; prefixed with `=`, as in `--exclude =api`, it drops only the
+repository with exactly that name, so `api-gateway` stays.
 
 Clones land under the user's cache directory; `--clones <dir>` points a workspace
 at a tree something else maintains instead.

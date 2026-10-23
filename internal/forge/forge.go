@@ -45,7 +45,8 @@ type Config struct {
 	BaseURL string
 	// Dir is the directory of checkouts the local forge reads.
 	Dir string
-	// Exclude drops repositories whose name contains any of these substrings.
+	// Exclude drops repositories whose name contains any of these substrings, or,
+	// for an entry starting with "=", whose name is exactly the rest of it.
 	Exclude []string
 	Credential
 	// HTTP is the client every request goes through, so a test never opens a
@@ -100,10 +101,33 @@ func CleanRemote(remote string) string {
 	return remote
 }
 
+// ExactPrefix marks an exclude entry that matches a whole name. A substring
+// cannot name "api" without also taking "api-gateway" with it.
+const ExactPrefix = "="
+
+// excludeForms is how an exclude entry is read, asked in order: the first form
+// whose prefix the entry carries decides, and the bare form is the fallback.
+var excludeForms = []struct {
+	prefix string
+	match  func(name, pattern string) bool
+}{
+	{ExactPrefix, func(name, pattern string) bool { return name == pattern }},
+	{"", strings.Contains},
+}
+
 func (c Config) excluded(name string) bool {
-	for _, pattern := range c.Exclude {
-		if pattern != "" && strings.Contains(name, pattern) {
-			return true
+	for _, entry := range c.Exclude {
+		for _, form := range excludeForms {
+			if !strings.HasPrefix(entry, form.prefix) {
+				continue
+			}
+			// An empty pattern would match every name as a substring and
+			// silently exclude the whole account.
+			pattern := entry[len(form.prefix):]
+			if pattern != "" && form.match(name, pattern) {
+				return true
+			}
+			break
 		}
 	}
 	return false
