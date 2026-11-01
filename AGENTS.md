@@ -47,6 +47,8 @@ checked out beside it.
   the signing identity, and an ad-hoc signature anchors to the cdhash - so an
   unsigned rebuild silently loses access to every token it stored. Build with
   `scripts/sign.sh`, which refuses a requirement that still mentions a cdhash.
+  Signing does not remove the one dialog after an upgrade (no Team ID, so the
+  item is partitioned by cdhash); an approved read stores the item again.
 - **No emoji.** Not in code, comments, docs, or commit messages.
 
 ## Code
@@ -74,8 +76,8 @@ checked out beside it.
 - Tests live beside the code as `*_test.go`. Whoever writes the code writes its tests.
 - Table-driven. **No network, no real git, no real keychain, no real model call** in any
   test. Every external dependency sits behind an interface with an in-memory fake. The
-  one test that touches a real keychain is gated behind both a build tag and an
-  environment variable so it never runs by accident.
+  OS credential store is reached through `gokey`, whose own suite covers the real
+  thing; nothing here may open the developer's login keychain.
 - Test the decision, not the implementation. Several tests exist specifically to stop a
   past mistake being reintroduced - the commit hash entering the fingerprint, the
   structured-output field being renamed to `description`, a narrowed run erasing the

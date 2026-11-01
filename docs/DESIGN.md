@@ -288,6 +288,7 @@ main.go
     └── internal/cmdutil     Factory: the dependency bundle, and ExitCode
         ├── internal/config        named workspaces, backends, profiles
         ├── internal/credentials   keychain store, env path, opt-in plaintext
+        │   └── gokey (external)       the OS credential stores
         ├── internal/iostreams     streams, tty, prompts
         ├── internal/output        table and json writers
         │
@@ -373,14 +374,31 @@ of identical source. Unsigned, the tool therefore loses access to every token it
 stored the moment it is rebuilt, or upgraded.
 
 The fix is a certificate, not a weaker binding. Signed, the requirement the
-keychain stores is the identifier plus the signing authority, with no content
-hash in it, so any later build signed by the same certificate is the same
-program. `scripts/sign.sh` does it and then checks its own work: a requirement
+item's access list stores is the identifier plus the signing authority, with no
+content hash in it, so any later build signed by the same certificate is the same
+program to it. `scripts/sign.sh` does it and then checks its own work: a requirement
 that still mentions a cdhash fails the build, because the alternative is handing
 somebody a binary that will lock them out later for reasons they cannot see.
 The check once matched only the `# designated =>` form, read an empty requirement
 from a codesign that omits the `# `, and passed everything; it now accepts both
 forms and fails on an empty read, so a check that cannot see is not a pass.
+
+The certificate does not reach the item's partition list. Without an Apple
+Developer ID there is no Team ID, so macOS partitions an item by cdhash, and the
+first read after each upgrade is refused until a human approves the dialog. The
+keychain therefore reads silently first, and only on that refusal, and only on an
+interactive terminal, reads again with the dialog allowed; an approved read
+stores the item again so it is bound to the new build, and the dialog comes once
+per upgrade rather than on every run. A re-save that fails is a warning, not a
+failed read. Unattended, the read fails with its remedy instead of waiting on a
+dialog nobody can see. Only a Developer ID certificate, a teamid partition,
+removes the upgrade dialog.
+
+The keychain is reached through [gokey](https://github.com/branow/gokey), which
+loads the Security framework at run time rather than linking it, so the darwin
+release is a `CGO_ENABLED=0` build like every other. Items are generic passwords
+under service `repomap` and the store key as account, holding the raw secret,
+which is the layout the earlier cgo backend wrote, so they read as they are.
 
 What was explicitly rejected is dropping the binding to make the problem go
 away. It is the one real protection the macOS path has over the other platforms,
@@ -416,5 +434,8 @@ full one pay, that a failed describe leaves a row the next run repairs, that an
 unreadable repository is skipped rather than fatal, that the source is closed
 before the first model call.
 
-The real-keychain test is gated behind both a build tag and an environment
-variable, so `go test ./...` never touches the developer's login keychain.
+The OS credential store is reached through gokey, and the round trip against a
+real store is its suite's job, not this one's: `go test ./...` never touches the
+developer's login keychain. The keychain's own rules - an item another build
+stored is refused silently, released by the dialog, and stored again - are
+modelled by a fake.

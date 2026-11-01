@@ -7,10 +7,12 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/branow/gokey"
 )
 
 // stub is a keychain whose three operations are scripted, so every branch is
-// reachable without an operating system keychain being present.
+// reachable without an operating system credential store being present.
 func stub(values map[string]string, failure error) *Keychain {
 	return script(NewKeychain("test"), values, failure)
 }
@@ -18,53 +20,64 @@ func stub(values map[string]string, failure error) *Keychain {
 // script fills in the seams of an already built keychain, so a test can choose
 // how the keychain was constructed and still drive it from memory.
 func script(k *Keychain, values map[string]string, failure error) *Keychain {
-	k.get = func(_, key string, _ ui) (string, error) {
+	k.get = func(_, key string, _ bool) (string, error) {
 		if failure != nil {
 			return "", failure
 		}
 		value, ok := values[key]
 		if !ok {
-			return "", errMissing
+			return "", gokey.ErrNotFound
 		}
 		return value, nil
 	}
-	k.set = func(_, key, value string, _ ui) error {
+	k.set = func(_, key, value string, _ bool) error {
 		if failure != nil {
 			return failure
 		}
 		values[key] = value
 		return nil
 	}
-	k.remove = func(_, key string, _ ui) error {
+	k.remove = func(_, key string, _ bool) error {
 		if failure != nil {
 			return failure
 		}
 		if _, ok := values[key]; !ok {
-			return errMissing
+			return gokey.ErrNotFound
 		}
 		delete(values, key)
 		return nil
 	}
+	// Never the real /usr/bin/security from a test.
+	k.dropForeign = func(_, _ string) error {
+		return errors.New("the scripted keychain owns every item")
+	}
 	return k
 }
 
-// spy records the UI choice every operation is made with. Whether a dialog was
-// refused is invisible in the result of a call, so the test asserts on what
+// call is one operation as it reached a seam: which one, and whether it was
+// allowed to raise the dialog.
+type call struct {
+	op     string
+	prompt bool
+}
+
+// spy records the prompt choice every operation is made with. Whether a dialog
+// was refused is invisible in the result of a call, so the test asserts on what
 // reached the seam instead.
-func spy(k *Keychain) *[]ui {
-	seen := &[]ui{}
+func spy(k *Keychain) *[]call {
+	seen := &[]call{}
 	get, set, remove := k.get, k.set, k.remove
-	k.get = func(service, key string, allow ui) (string, error) {
-		*seen = append(*seen, allow)
-		return get(service, key, allow)
+	k.get = func(service, key string, prompt bool) (string, error) {
+		*seen = append(*seen, call{"get", prompt})
+		return get(service, key, prompt)
 	}
-	k.set = func(service, key, value string, allow ui) error {
-		*seen = append(*seen, allow)
-		return set(service, key, value, allow)
+	k.set = func(service, key, value string, prompt bool) error {
+		*seen = append(*seen, call{"set", prompt})
+		return set(service, key, value, prompt)
 	}
-	k.remove = func(service, key string, allow ui) error {
-		*seen = append(*seen, allow)
-		return remove(service, key, allow)
+	k.remove = func(service, key string, prompt bool) error {
+		*seen = append(*seen, call{"remove", prompt})
+		return remove(service, key, prompt)
 	}
 	return seen
 }
@@ -101,16 +114,21 @@ func TestKeychainErrors(t *testing.T) {
 
 // TestKeychainAsksOnlyWhenSomeoneIsWatching is the hang this prevents: a store
 // not told a human is present must refuse the keychain's dialog on every
-// operation, because a dialog nobody can see blocks forever.
+// operation, because a dialog nobody can see blocks forever. A read is silent
+// first even when someone is watching: an item this build stored needs no
+// dialog, and only a refusal earns one.
 func TestKeychainAsksOnlyWhenSomeoneIsWatching(t *testing.T) {
 	tests := []struct {
 		name     string
 		keychain *Keychain
-		want     ui
+		want     []call
 	}{
-		{name: "default", keychain: NewKeychain("test"), want: noUI},
-		{name: "non-interactive", keychain: newKeychain("test", noUI), want: noUI},
-		{name: "interactive", keychain: newKeychain("test", allowUI), want: allowUI},
+		{name: "default", keychain: NewKeychain("test"),
+			want: []call{{"get", false}, {"set", false}, {"remove", false}}},
+		{name: "non-interactive", keychain: newKeychain("test", false, nil),
+			want: []call{{"get", false}, {"set", false}, {"remove", false}}},
+		{name: "interactive", keychain: newKeychain("test", true, nil),
+			want: []call{{"get", false}, {"set", true}, {"remove", true}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -126,12 +144,12 @@ func TestKeychainAsksOnlyWhenSomeoneIsWatching(t *testing.T) {
 			if err := keychain.Delete(key); err != nil {
 				t.Fatalf("Delete: %v", err)
 			}
-			if len(*seen) != 3 {
-				t.Fatalf("calls recorded = %d, want 3", len(*seen))
+			if len(*seen) != len(tt.want) {
+				t.Fatalf("calls = %v, want %v", *seen, tt.want)
 			}
-			for i, allow := range *seen {
-				if allow != tt.want {
-					t.Errorf("call %d asked with ui %v, want %v", i, allow, tt.want)
+			for i, got := range *seen {
+				if got != tt.want[i] {
+					t.Errorf("call %d = %v, want %v", i, got, tt.want[i])
 				}
 			}
 		})
@@ -142,13 +160,13 @@ func TestKeychainAsksOnlyWhenSomeoneIsWatching(t *testing.T) {
 // rebuild: "keychain unavailable" alone leaves them nothing to do.
 func TestBlockedKeychainNamesBothWaysOut(t *testing.T) {
 	key := ForgeKey("primary")
-	_, err := stub(nil, errBlocked).Get(key)
+	_, err := stub(nil, gokey.ErrBlocked).Get(key)
 
 	var failure *KeychainError
 	if !errors.As(err, &failure) {
 		t.Fatalf("error = %v, want KeychainError", err)
 	}
-	if !errors.Is(err, errBlocked) {
+	if !errors.Is(err, gokey.ErrBlocked) {
 		t.Error("the cause was dropped")
 	}
 	for _, want := range []string{"re-authorize", "re-add", EnvName(key)} {
@@ -158,6 +176,30 @@ func TestBlockedKeychainNamesBothWaysOut(t *testing.T) {
 	}
 	if strings.Contains(failure.Remedy, "--allow-plaintext") {
 		t.Error("a blocked read offers the plaintext file instead of the way out")
+	}
+}
+
+// TestUnavailableKeychainDoesNotOfferToReauthorize separates the two refusals:
+// there is no credential store to re-authorize against on a headless box, so
+// the only remedies worth printing are the ones that need no keychain.
+func TestUnavailableKeychainDoesNotOfferToReauthorize(t *testing.T) {
+	key := ForgeKey("primary")
+	_, err := stub(nil, gokey.ErrUnavailable).Get(key)
+
+	var failure *KeychainError
+	if !errors.As(err, &failure) {
+		t.Fatalf("error = %v, want KeychainError", err)
+	}
+	if !errors.Is(err, gokey.ErrUnavailable) {
+		t.Error("the cause was dropped")
+	}
+	if strings.Contains(failure.Remedy, "re-authorize") {
+		t.Error("the remedy asks the user to re-authorize a store that is not there")
+	}
+	for _, want := range []string{"no OS credential store", "--allow-plaintext"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("message %q does not mention %q", err.Error(), want)
+		}
 	}
 }
 
@@ -231,15 +273,16 @@ func TestFakeStore(t *testing.T) {
 	}
 }
 
-// TestNewKeychainUsesThePlatformBackend catches a build where no platform file
-// supplied the three operations, which would otherwise be a nil call at runtime.
-func TestNewKeychainUsesThePlatformBackend(t *testing.T) {
+// TestNewKeychainUsesTheBackend catches a build where the gokey calls were not
+// wired into the seams, which would otherwise be a nil call at runtime.
+func TestNewKeychainUsesTheBackend(t *testing.T) {
 	keychain := NewKeychain("")
 	if keychain.Service != Service {
 		t.Errorf("service = %q, want %q", keychain.Service, Service)
 	}
-	if keychain.get == nil || keychain.set == nil || keychain.remove == nil {
-		t.Fatal("the platform backend is not wired")
+	if keychain.get == nil || keychain.set == nil || keychain.remove == nil ||
+		keychain.dropForeign == nil {
+		t.Fatal("the backend is not wired")
 	}
 	if named := NewKeychain("other"); named.Service != "other" {
 		t.Errorf("service = %q, want the one given", named.Service)

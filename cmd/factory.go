@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"time"
 
 	"github.com/branow/gollm"
@@ -133,9 +134,10 @@ func openSource(name string, entry config.Workspace,
 // lets a headless run work with no keychain at all.
 //
 // interactive may be true only when a person is watching a terminal: the macOS
-// keychain binds an item to the storing binary's code identity, so a rebuilt
-// binary is asked to re-authorize, and a dialog nobody can see blocks forever.
-func openStore(c *config.Config, o config.Overrides, interactive bool) (credentials.Store, error) {
+// keychain binds an item to the storing binary's code identity, so a rebuilt or
+// upgraded binary is asked to re-authorize, and a dialog nobody can see blocks
+// forever. warn receives what the store reports without failing the command.
+func openStore(c *config.Config, o config.Overrides, interactive bool, warn io.Writer) (credentials.Store, error) {
 	fallback, err := c.Fallback(o)
 	if err != nil {
 		return nil, err
@@ -149,5 +151,6 @@ func openStore(c *config.Config, o config.Overrides, interactive bool) (credenti
 		Service:     credentials.Service,
 		File:        file,
 		Interactive: interactive,
+		Warn:        warn,
 	})
 }

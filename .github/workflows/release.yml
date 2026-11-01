@@ -10,10 +10,9 @@ permissions:
   contents: write
 
 jobs:
-  # One macOS runner builds everything. The darwin artifacts are cgo builds -
-  # the keychain backend calls the Security framework directly - so they cannot
-  # be produced anywhere else; linux and windows are CGO_ENABLED=0 in
-  # .goreleaser.yml and cross-compile from here without help.
+  # One macOS runner builds everything. Every artifact is a CGO_ENABLED=0 build
+  # and cross-compiles, but the darwin ones are signed, and codesign runs only
+  # on macOS.
   release:
     runs-on: macos-latest
     steps:
