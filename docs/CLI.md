@@ -295,8 +295,15 @@ The keychain binds each stored secret to the code identity of the binary that
 stored it, and Go ad-hoc signs by default - an identity that is the binary's
 content hash, so it changes with every build. Unsigned, repomap loses access to
 every token it stored the moment it is rebuilt or upgraded. Signing with a
-certificate replaces that hash with the identifier plus the signing authority,
-which survives both. [docs/DESIGN.md](DESIGN.md) has the reasoning.
+certificate replaces that hash in the item's access list with the identifier
+plus the signing authority, which survives both.
+
+Signing does not remove one dialog: without an Apple Team ID the keychain also
+partitions an item by cdhash, so the first read after an upgrade asks once per
+token. On a terminal, allow it and repomap stores the token again under the new
+build, so later runs are silent. Unattended, the read fails with its remedy
+instead of waiting on a dialog nobody can see. [docs/DESIGN.md](DESIGN.md) has
+the reasoning.
 
 Releases are signed by `scripts/sign.sh`, which goreleaser runs after each macOS
 build and which fails if the requirement still mentions a cdhash. The release
@@ -323,7 +330,7 @@ Building locally needs an identity of your own, created once:
    **Code Signing**
 3. `export REPOMAP_SIGN_IDENTITY=repomap-dev`
 
-Then sign after building, and the keychain stops asking:
+Then sign after building, so the item's access list keeps naming your build:
 
 ```sh
 go build -o ~/.local/bin/repomap . && scripts/sign.sh ~/.local/bin/repomap
@@ -344,7 +351,8 @@ a CI runner works.
 go install github.com/branow/repomap@latest
 ```
 
-Requires Go 1.26+ and git on `PATH`. On macOS, build with `CGO_ENABLED=1` (the
-default for a native build). The keychain backend uses the Security framework so
-each stored secret is bound to the binary that stored it; a `CGO_ENABLED=0` macOS
-build silently falls back to a weaker path.
+Requires Go 1.26+ and git on `PATH`, and nothing else: no platform needs a C
+toolchain. On macOS the keychain backend loads the Security framework at run
+time, so each stored secret is still bound to the binary that stored it. Windows
+and Linux use Credential Manager and the Secret Service respectively, neither of
+which binds an item to one program.

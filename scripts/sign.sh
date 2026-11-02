@@ -1,5 +1,6 @@
 #!/bin/sh
-# Sign a macOS build so the keychain keeps trusting it across rebuilds.
+# Sign a macOS build so the keychain's access list keeps naming it across
+# rebuilds.
 #
 # The keychain binds each stored secret to the code identity of the binary that
 # stored it. Go ad-hoc signs by default, and an ad-hoc signature has no
@@ -7,9 +8,14 @@
 # which is different for every build, even of identical source. The result is
 # that every `go build` invalidates every stored token.
 #
-# A certificate fixes it. Signed, the designated requirement becomes the
-# identifier plus the signing authority, with no cdhash in it, so any later build
-# signed by the same certificate satisfies the same requirement.
+# A certificate fixes the access list. Signed, the designated requirement
+# becomes the identifier plus the signing authority, with no cdhash in it, so
+# any later build signed by the same certificate satisfies the same requirement.
+# The keychain's partition list does not follow: without an Apple Developer ID
+# there is no Team ID, so macOS partitions the item by cdhash, and the first
+# read after an upgrade still raises one dialog per token. The keychain store
+# stores the item again after that approval, so it is once per upgrade. Only a
+# Developer ID certificate (a teamid partition) removes it.
 #
 #   REPOMAP_SIGN_IDENTITY  the identity to sign with, as `security find-identity
 #                          -v -p codesigning` prints it. Required.
